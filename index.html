@@ -164,15 +164,16 @@
         const Users = (props) => <Icon name="users" {...props} />;
 
         // --- Types & Constants ---
-        const UserRole = { Admin: 'Admin', Staff: 'Staff', Student: 'Student', Teacher: 'Teacher' };
+        const UserRole = { Admin: 'Admin', Staff: 'Staff' };
         const DeviceStatus = { Available: 'Available', Borrowed: 'Borrowed', Maintenance: 'Maintenance', PendingApproval: 'PendingApproval', Lost: 'Lost' };
 
         const translations = {
             th: {
                 dashboard: 'แผงควบคุม',
                 inventory: 'คลังอุปกรณ์',
-                borrow: 'ยืม-คืน',
-                admin: 'ผู้ดูแลระบบ',
+                borrow: 'ระบบ ยืม-คืน',
+                registry: 'ทะเบียนรายชื่อ',
+                repair: 'แจ้งซ่อม',
                 logout: 'ออกจากระบบ',
                 welcome: 'ยินดีต้อนรับ',
                 total_devices: 'อุปกรณ์ทั้งหมด',
@@ -180,12 +181,12 @@
                 borrowed: 'ถูกยืม',
                 maintenance: 'ซ่อมบำรุง',
                 loading: 'กำลังโหลด...',
-                login: 'เข้าสู่ระบบ',
+                login: 'เข้าระบบ',
                 username: 'ชื่อผู้ใช้',
                 password: 'รหัสผ่าน',
                 back: 'กลับ',
                 start: 'เริ่มต้นใช้งาน',
-                admin_login: 'เข้าสู่ระบบผู้ดูแล',
+                admin_login: 'เข้าระบบ',
                 db_connected: 'เชื่อมต่อฐานข้อมูลแล้ว',
                 db_disconnected: 'ไม่ได้เชื่อมต่อฐานข้อมูล',
             }
@@ -256,7 +257,7 @@
                             <Tablet className="text-white w-6 h-6" />
                             <span className="font-bold text-xl">iPad Check</span>
                         </div>
-                        <button onClick={onAdminLogin} className="btn-primary py-2 px-4 text-sm">แอดมิน</button>
+                        <button onClick={onAdminLogin} className="btn-primary py-2 px-4 text-sm">เข้าระบบ</button>
                     </header>
                     <main className="pt-48 px-6 max-w-7xl mx-auto">{renderSection()}</main>
                 </div>
@@ -290,51 +291,690 @@
 
         const Layout = ({ children, currentUser, activeTab, setActiveTab, onLogout, t }) => (
             <div className="min-h-screen bg-spk-gray">
-                <nav className="bg-spk-blue text-white p-4 shadow-lg">
-                    <div className="max-w-7xl mx-auto flex justify-between items-center">
-                        <h1 className="text-xl font-bold">iPad Check</h1>
-                        <div className="flex gap-4">
-                            <button onClick={() => setActiveTab('dashboard')} className={`px-4 py-2 rounded-lg ${activeTab === 'dashboard' ? 'bg-spk-yellow text-spk-blue' : ''}`}>แผงควบคุม</button>
-                            <button onClick={() => setActiveTab('inventory')} className={`px-4 py-2 rounded-lg ${activeTab === 'inventory' ? 'bg-spk-yellow text-spk-blue' : ''}`}>คลังอุปกรณ์</button>
-                            <button onClick={() => setActiveTab('borrow')} className={`px-4 py-2 rounded-lg ${activeTab === 'borrow' ? 'bg-spk-yellow text-spk-blue' : ''}`}>ยืม-คืน</button>
-                            {currentUser.role === 'Admin' && <button onClick={() => setActiveTab('admin')} className={`px-4 py-2 rounded-lg ${activeTab === 'admin' ? 'bg-spk-yellow text-spk-blue' : ''}`}>แอดมิน</button>}
-                            <button onClick={onLogout} className="px-4 py-2 text-red-300">ออกจากระบบ</button>
+                <nav className="bg-spk-blue text-white shadow-lg">
+                    {/* Row 1: Brand and User */}
+                    <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center border-b border-white/10">
+                        <div className="flex items-center gap-3">
+                            <img src="https://www.spk.ac.th/home/wp-content/uploads/2025/10/spk-logo-png-new-1.png" className="w-10 h-10" />
+                            <div>
+                                <h1 className="text-lg font-bold leading-none">SPK ICT</h1>
+                                <p className="text-[10px] opacity-70 uppercase tracking-widest">Inventory System</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-4">
+                            <div className="text-right hidden sm:block">
+                                <p className="text-sm font-bold">{currentUser.name}</p>
+                                <p className="text-[10px] opacity-70 uppercase">{currentUser.role}</p>
+                            </div>
+                            <button onClick={onLogout} className="p-2 hover:bg-white/10 rounded-full text-red-300 transition-colors">
+                                <LogOut size={20} />
+                            </button>
+                        </div>
+                    </div>
+                    {/* Row 2: Navigation */}
+                    <div className="max-w-7xl mx-auto px-4 overflow-x-auto">
+                        <div className="flex gap-2 py-2 min-w-max">
+                            <button onClick={() => setActiveTab('dashboard')} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${activeTab === 'dashboard' ? 'bg-spk-yellow text-spk-blue shadow-lg' : 'hover:bg-white/10'}`}>
+                                <LayoutDashboard size={18} />
+                                {t('dashboard')}
+                            </button>
+                            <button onClick={() => setActiveTab('inventory')} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${activeTab === 'inventory' ? 'bg-spk-yellow text-spk-blue shadow-lg' : 'hover:bg-white/10'}`}>
+                                <Package size={18} />
+                                {t('inventory')}
+                            </button>
+                            <button onClick={() => setActiveTab('borrow')} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${activeTab === 'borrow' ? 'bg-spk-yellow text-spk-blue shadow-lg' : 'hover:bg-white/10'}`}>
+                                <ArrowRightLeft size={18} />
+                                {t('borrow')}
+                            </button>
+                            <button onClick={() => setActiveTab('registry')} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${activeTab === 'registry' ? 'bg-spk-yellow text-spk-blue shadow-lg' : 'hover:bg-white/10'}`}>
+                                <Users size={18} />
+                                {t('registry')}
+                            </button>
+                            <button onClick={() => setActiveTab('repair')} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${activeTab === 'repair' ? 'bg-spk-yellow text-spk-blue shadow-lg' : 'hover:bg-white/10'}`}>
+                                <Settings size={18} />
+                                {t('repair')}
+                            </button>
                         </div>
                     </div>
                 </nav>
-                <main className="p-8 max-w-7xl mx-auto">{children}</main>
+                <main className="p-4 md:p-8 max-w-7xl mx-auto">{children}</main>
             </div>
         );
 
-        const AdminPanel = ({ devices, categories, onUpdate, t }) => (
-            <div className="space-y-6">
-                <h2 className="text-3xl font-bold text-spk-blue">แผงควบคุมผู้ดูแลระบบ</h2>
-                <div className="card">
-                    <table className="w-full text-left">
-                        <thead>
-                            <tr className="border-b text-gray-500">
-                                <th className="p-4">ชื่ออุปกรณ์</th>
-                                <th className="p-4">หมายเลขเครื่อง</th>
-                                <th className="p-4">สถานะ</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {devices.map(d => (
-                                <tr key={d.id} className="border-b hover:bg-gray-50">
-                                    <td className="p-4 font-medium">{d.name}</td>
-                                    <td className="p-4 font-mono text-sm">{d.serial_number}</td>
-                                    <td className="p-4">
-                                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${d.status === 'Available' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
-                                            {d.status === 'Available' ? 'ว่าง' : d.status === 'Borrowed' ? 'ถูกยืม' : d.status}
-                                        </span>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+        const Dashboard = ({ stats, transactions, t }) => (
+            <div className="space-y-8">
+                <div className="flex justify-between items-center">
+                    <h2 className="text-3xl font-bold text-spk-blue">แผงควบคุม</h2>
+                    <div className="text-sm text-gray-500 bg-white px-4 py-2 rounded-xl shadow-sm border border-gray-100">
+                        อัปเดตล่าสุด: {new Date().toLocaleString('th-TH')}
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    {/* Main Card: Device Status Overview */}
+                    <div className="lg:col-span-2 card border-none shadow-xl bg-white overflow-hidden">
+                        <div className="p-6 border-b border-gray-50 flex justify-between items-center">
+                            <div>
+                                <h3 className="font-bold text-xl text-spk-blue">ภาพรวมสถานะอุปกรณ์</h3>
+                                <p className="text-sm text-gray-500">สรุปข้อมูลการใช้งานเครื่อง iPad ทั้งหมดในระบบ</p>
+                            </div>
+                            <BarChart3 className="text-spk-blue opacity-20" size={32} />
+                        </div>
+                        <div className="p-8 grid grid-cols-1 sm:grid-cols-3 gap-8">
+                            <div className="flex flex-col items-center p-6 rounded-3xl bg-green-50 border border-green-100 transition-transform hover:scale-105">
+                                <CheckCircle className="text-green-600 mb-3" size={32} />
+                                <span className="text-sm font-medium text-green-800 mb-1">พร้อมใช้งาน</span>
+                                <div className="flex items-baseline gap-1">
+                                    <span className="text-4xl font-black text-green-700">{stats.available}</span>
+                                    <span className="text-xs text-green-600 font-bold">เครื่อง</span>
+                                </div>
+                            </div>
+                            <div className="flex flex-col items-center p-6 rounded-3xl bg-blue-50 border border-blue-100 transition-transform hover:scale-105">
+                                <ArrowRightLeft className="text-blue-600 mb-3" size={32} />
+                                <span className="text-sm font-medium text-blue-800 mb-1">ถูกยืม</span>
+                                <div className="flex items-baseline gap-1">
+                                    <span className="text-4xl font-black text-blue-700">{stats.borrowed}</span>
+                                    <span className="text-xs text-blue-600 font-bold">เครื่อง</span>
+                                </div>
+                            </div>
+                            <div className="flex flex-col items-center p-6 rounded-3xl bg-orange-50 border border-orange-100 transition-transform hover:scale-105">
+                                <AlertTriangle className="text-orange-600 mb-3" size={32} />
+                                <span className="text-sm font-medium text-orange-800 mb-1">ส่งซ่อม</span>
+                                <div className="flex items-baseline gap-1">
+                                    <span className="text-4xl font-black text-orange-700">{stats.maintenance}</span>
+                                    <span className="text-xs text-orange-600 font-bold">เครื่อง</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="p-6 bg-gray-50 border-t border-gray-100 flex justify-center">
+                            <div className="flex items-center gap-2 text-sm text-gray-500">
+                                <Info size={16} />
+                                <span>จำนวนอุปกรณ์ทั้งหมดในคลัง: <span className="font-bold text-spk-blue">{stats.total}</span> เครื่อง</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Second Card: Recent Activity */}
+                    <div className="card border-none shadow-xl bg-white flex flex-col">
+                        <div className="p-6 border-b border-gray-50 flex justify-between items-center">
+                            <h3 className="font-bold text-xl text-spk-blue">กิจกรรมล่าสุด</h3>
+                            <Clock className="text-gray-400" size={24} />
+                        </div>
+                        <div className="flex-1 p-6 overflow-y-auto max-h-[400px]">
+                            {transactions.length > 0 ? (
+                                <div className="space-y-6">
+                                    {transactions.slice(0, 5).map((t, i) => (
+                                        <div key={i} className="flex gap-4 relative">
+                                            {i !== transactions.slice(0, 5).length - 1 && (
+                                                <div className="absolute left-[15px] top-8 bottom-[-24px] w-0.5 bg-gray-100"></div>
+                                            )}
+                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 z-10 ${t.status === 'Borrowed' ? 'bg-blue-100 text-blue-600' : 'bg-green-100 text-green-600'}`}>
+                                                {t.status === 'Borrowed' ? <LogIn size={14} /> : <CheckCircle size={14} />}
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-bold text-gray-800">{t.fname}</p>
+                                                <p className="text-xs text-gray-500 mb-1">{t.status === 'Borrowed' ? 'ยืม' : 'คืน'}เครื่อง {t.serial_number}</p>
+                                                <p className="text-[10px] text-gray-400">{t.borrow_date} {t.borrowTime}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="h-full flex flex-col items-center justify-center text-gray-400 py-12">
+                                    <Clock size={48} className="mb-4 opacity-20" />
+                                    <p>ไม่มีกิจกรรมล่าสุด</p>
+                                </div>
+                            )}
+                        </div>
+                        <div className="p-4 border-t border-gray-50">
+                            <button className="w-full py-3 text-sm font-bold text-spk-blue hover:bg-blue-50 rounded-xl transition-colors flex items-center justify-center gap-2">
+                                ดูประวัติทั้งหมด
+                                <ArrowRightLeft size={16} />
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         );
+
+        const Inventory = ({ devices, categories, onUpdate, t }) => {
+            const [currentPage, setCurrentPage] = useState(1);
+            const [searchTerm, setSearchTerm] = useState('');
+            const [filterStatus, setFilterStatus] = useState('all');
+            const [showAdminMenu, setShowAdminMenu] = useState(false);
+            const itemsPerPage = 31;
+
+            const filteredDevices = devices.filter(d => {
+                const matchesSearch = d.name.toLowerCase().includes(searchTerm.toLowerCase()) || d.serial_number.toLowerCase().includes(searchTerm.toLowerCase());
+                const matchesStatus = filterStatus === 'all' || d.status === filterStatus;
+                return matchesSearch && matchesStatus;
+            });
+
+            const totalPages = Math.ceil(filteredDevices.length / itemsPerPage);
+            const currentDevices = filteredDevices.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+            return (
+                <div className="space-y-6">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        <h2 className="text-3xl font-bold text-spk-blue">คลังอุปกรณ์</h2>
+                        <div className="flex gap-2">
+                            <button onClick={() => setShowAdminMenu(!showAdminMenu)} className="btn-primary py-2 px-4 text-sm flex items-center gap-2 bg-spk-yellow text-spk-blue">
+                                <Settings size={18} />
+                                จัดการข้อมูล
+                            </button>
+                            <button className="btn-primary py-2 px-4 text-sm flex items-center gap-2">
+                                <FileText size={18} />
+                                ปรินท์เอกสาร
+                            </button>
+                        </div>
+                    </div>
+
+                    {showAdminMenu && (
+                        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-4 bg-white rounded-3xl shadow-lg border border-blue-50">
+                            <button className="flex items-center gap-3 p-4 rounded-2xl hover:bg-blue-50 text-spk-blue transition-colors text-left">
+                                <div className="p-2 bg-blue-100 rounded-lg"><Plus size={20} /></div>
+                                <div>
+                                    <p className="font-bold text-sm">เพิ่มสินค้าใหม่</p>
+                                    <p className="text-[10px] opacity-60">จัดการ Categories</p>
+                                </div>
+                            </button>
+                            <button className="flex items-center gap-3 p-4 rounded-2xl hover:bg-blue-50 text-spk-blue transition-colors text-left">
+                                <div className="p-2 bg-blue-100 rounded-lg"><Send size={20} /></div>
+                                <div>
+                                    <p className="font-bold text-sm">นำเข้าข้อมูล</p>
+                                    <p className="text-[10px] opacity-60">JSON / CSV / Sheets</p>
+                                </div>
+                            </button>
+                            {/* More sub-menus can be added here */}
+                        </motion.div>
+                    )}
+
+                    <div className="card border-none shadow-xl overflow-hidden bg-white">
+                        <div className="p-6 border-b border-gray-50 flex flex-col sm:flex-row gap-4 justify-between items-center">
+                            <div className="relative w-full sm:w-96">
+                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                                <input 
+                                    type="text" 
+                                    placeholder="ค้นหาชื่อ หรือ Serial Number..." 
+                                    className="input-field pl-12 py-2 text-sm"
+                                    value={searchTerm}
+                                    onChange={e => setSearchTerm(e.target.value)}
+                                />
+                            </div>
+                            <div className="flex gap-2 w-full sm:w-auto">
+                                <select 
+                                    className="input-field py-2 text-sm w-full sm:w-40"
+                                    value={filterStatus}
+                                    onChange={e => setFilterStatus(e.target.value)}
+                                >
+                                    <option value="all">สถานะทั้งหมด</option>
+                                    <option value="Available">ว่าง</option>
+                                    <option value="Borrowed">ถูกยืม</option>
+                                    <option value="Maintenance">ซ่อมบำรุง</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left">
+                                <thead className="bg-gray-50">
+                                    <tr className="text-gray-500 text-[10px] uppercase tracking-widest font-bold">
+                                        <th className="p-6">สินค้า</th>
+                                        <th className="p-6">หมวดหมู่</th>
+                                        <th className="p-6">ผู้ยืมปัจจุบัน</th>
+                                        <th className="p-6">สถานะ</th>
+                                        <th className="p-6 text-right">จัดการ</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-50">
+                                    {currentDevices.map(d => (
+                                        <tr key={d.id} className="hover:bg-blue-50/30 transition-colors group">
+                                            <td className="p-6">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="w-12 h-12 rounded-xl bg-gray-100 overflow-hidden shrink-0">
+                                                        <img src={d.imageUrl || 'https://picsum.photos/seed/'+d.id+'/100/100'} className="w-full h-full object-cover" />
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-bold text-sm text-gray-800">{d.name}</p>
+                                                        <p className="text-[10px] font-mono text-gray-400">{d.serial_number}</p>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="p-6">
+                                                <span className="text-xs font-medium text-gray-600 bg-gray-100 px-3 py-1 rounded-full">{categories.find(c => c.id === d.category_id)?.name || 'N/A'}</span>
+                                            </td>
+                                            <td className="p-6">
+                                                <p className="text-sm text-gray-600">{d.status === 'Borrowed' ? 'นักเรียน ม.4/1' : '-'}</p>
+                                            </td>
+                                            <td className="p-6">
+                                                <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${d.status === 'Available' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+                                                    {d.status === 'Available' ? 'ว่าง' : 'ถูกยืม'}
+                                                </span>
+                                            </td>
+                                            <td className="p-6 text-right">
+                                                <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <button className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"><Edit2 size={16} /></button>
+                                                    <button className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"><Trash2 size={16} /></button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Pagination */}
+                        <div className="p-6 border-t border-gray-50 flex justify-between items-center bg-white">
+                            <p className="text-xs text-gray-500">แสดง {currentDevices.length} จาก {filteredDevices.length} รายการ</p>
+                            <div className="flex gap-2">
+                                <button 
+                                    disabled={currentPage === 1}
+                                    onClick={() => setCurrentPage(prev => prev - 1)}
+                                    className="p-2 rounded-xl border border-gray-200 disabled:opacity-30 hover:bg-gray-50 transition-colors"
+                                >
+                                    <ArrowLeft size={16} />
+                                </button>
+                                <div className="flex items-center px-4 text-sm font-bold text-spk-blue">
+                                    หน้า {currentPage} / {totalPages || 1}
+                                </div>
+                                <button 
+                                    disabled={currentPage === totalPages || totalPages === 0}
+                                    onClick={() => setCurrentPage(prev => prev + 1)}
+                                    className="p-2 rounded-xl border border-gray-200 disabled:opacity-30 hover:bg-gray-50 transition-colors"
+                                >
+                                    <ArrowRightLeft size={16} className="rotate-180" />
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const BorrowReturn = ({ devices, students, currentUser, onUpdate, t }) => {
+            const [mode, setMode] = useState('borrow');
+            const [selectedStudent, setSelectedStudent] = useState('');
+            const [searchTerm, setSearchTerm] = useState('');
+            const [serialSearch, setSerialSearch] = useState('');
+            const [isLoading, setIsLoading] = useState(false);
+            const [isScannerOpen, setIsScannerOpen] = useState(false);
+
+            const filteredStudents = students.filter(s => 
+                s.fullName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                s.studentId.includes(searchTerm)
+            );
+
+            const filteredDevices = devices.filter(d => {
+                const matchesMode = mode === 'borrow' ? d.status === 'Available' : d.status === 'Borrowed';
+                const matchesSerial = d.serial_number.toLowerCase().includes(serialSearch.toLowerCase());
+                return matchesMode && matchesSerial;
+            });
+
+            const handleAction = async (device) => {
+                if (mode === 'borrow' && !selectedStudent) {
+                    alert('โปรดเลือกนักเรียนก่อนดำเนินการ');
+                    return;
+                }
+
+                setIsLoading(true);
+                const student = students.find(s => s.studentId === selectedStudent);
+                
+                const transactionData = {
+                    borrowerId: selectedStudent,
+                    fid: selectedStudent,
+                    fname: student?.fullName || '',
+                    serial_number: device.serial_number,
+                    borrow_date: mode === 'borrow' ? new Date().toLocaleDateString('th-TH') : '',
+                    borrowTime: mode === 'borrow' ? new Date().toLocaleTimeString('th-TH') : '',
+                    return_date: mode === 'return' ? new Date().toLocaleDateString('th-TH') : '',
+                    status: mode === 'borrow' ? 'Borrowed' : 'Returned',
+                    recorder: currentUser.name
+                };
+
+                try {
+                    const res = await gasHelper(mode === 'borrow' ? 'append' : 'update', 'Transactions', transactionData);
+                    const devRes = await gasHelper('update', 'Devices', { id: device.id, status: mode === 'borrow' ? 'Borrowed' : 'Available' });
+
+                    if (res.success && devRes.success) {
+                        alert(mode === 'borrow' ? 'บันทึกการยืมสำเร็จ' : 'บันทึกการคืนสำเร็จ');
+                        onUpdate();
+                    }
+                } catch (err) {
+                    alert('เกิดข้อผิดพลาด: ' + err.message);
+                }
+                setIsLoading(false);
+            };
+
+            return (
+                <div className="space-y-6">
+                    <div className="flex justify-between items-center">
+                        <h2 className="text-3xl font-bold text-spk-blue">ระบบ ยืม-คืน</h2>
+                        <div className="bg-white p-1 rounded-xl flex shadow-sm">
+                            <button onClick={() => setMode('borrow')} className={`px-6 py-2 rounded-lg font-bold transition-all ${mode === 'borrow' ? 'bg-spk-blue text-white shadow-lg' : 'text-gray-400 hover:bg-gray-50'}`}>ยืมอุปกรณ์</button>
+                            <button onClick={() => setMode('return')} className={`px-6 py-2 rounded-lg font-bold transition-all ${mode === 'return' ? 'bg-spk-blue text-white shadow-lg' : 'text-gray-400 hover:bg-gray-50'}`}>คืนอุปกรณ์</button>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        <div className="lg:col-span-1 space-y-6">
+                            {mode === 'borrow' && (
+                                <div className="card border-none shadow-xl bg-white">
+                                    <h3 className="font-bold text-lg mb-4 flex items-center gap-2 text-spk-blue">
+                                        <UserIcon size={20} />
+                                        เลือกผู้ยืม
+                                    </h3>
+                                    <div className="relative mb-4">
+                                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                                        <input 
+                                            type="text" 
+                                            placeholder="ค้นหาชื่อ หรือ รหัสนักเรียน..." 
+                                            className="input-field pl-12 py-3 text-sm"
+                                            value={searchTerm}
+                                            onChange={e => setSearchTerm(e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="max-h-[300px] overflow-y-auto space-y-2 pr-2 custom-scrollbar">
+                                        {filteredStudents.map(s => (
+                                            <button 
+                                                key={s.studentId} 
+                                                onClick={() => setSelectedStudent(s.studentId)}
+                                                className={`w-full p-4 rounded-2xl text-left border-2 transition-all ${selectedStudent === s.studentId ? 'border-spk-blue bg-blue-50 shadow-md' : 'border-transparent bg-gray-50 hover:bg-gray-100'}`}
+                                            >
+                                                <p className="font-bold text-sm text-gray-800">{s.fullName}</p>
+                                                <p className="text-[10px] text-gray-500 uppercase tracking-wider">{s.studentId} • ม.{s.grade}/{s.classroom}</p>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            
+                            <div className="card border-none shadow-xl bg-spk-blue text-white p-6">
+                                <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
+                                    <Info size={20} />
+                                    สรุปรายการ
+                                </h3>
+                                <div className="space-y-4">
+                                    <div className="flex justify-between items-center text-sm">
+                                        <span className="opacity-70">โหมดการทำงาน</span>
+                                        <span className={`px-3 py-1 rounded-lg font-bold ${mode === 'borrow' ? 'bg-spk-yellow text-spk-blue' : 'bg-green-500 text-white'}`}>
+                                            {mode === 'borrow' ? 'ยืมอุปกรณ์' : 'คืนอุปกรณ์'}
+                                        </span>
+                                    </div>
+                                    {mode === 'borrow' && (
+                                        <div className="flex justify-between items-start text-sm border-t border-white/10 pt-4">
+                                            <span className="opacity-70">ผู้ยืม</span>
+                                            <span className="font-bold text-right">{students.find(s => s.studentId === selectedStudent)?.fullName || 'ยังไม่ได้เลือก'}</span>
+                                        </div>
+                                    )}
+                                    <div className="flex justify-between items-center text-sm border-t border-white/10 pt-4">
+                                        <span className="opacity-70">เจ้าหน้าที่</span>
+                                        <span className="font-bold">{currentUser.name}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="lg:col-span-2 space-y-6">
+                            <div className="card border-none shadow-xl bg-white p-6">
+                                <div className="flex flex-col sm:flex-row gap-4 justify-between items-center mb-6">
+                                    <h3 className="font-bold text-lg text-spk-blue">เลือกอุปกรณ์</h3>
+                                    <div className="flex gap-2 w-full sm:w-auto">
+                                        <div className="relative flex-1 sm:w-64">
+                                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                                            <input 
+                                                type="text" 
+                                                placeholder="ค้นหาด้วย Serial Number..." 
+                                                className="input-field pl-12 py-2 text-sm"
+                                                value={serialSearch}
+                                                onChange={e => setSerialSearch(e.target.value)}
+                                            />
+                                        </div>
+                                        <button 
+                                            onClick={() => setIsScannerOpen(true)}
+                                            className="p-3 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 transition-colors"
+                                        >
+                                            <QrCode size={20} />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    {filteredDevices.map(d => (
+                                        <div key={d.id} className="p-4 rounded-3xl border border-gray-100 bg-gray-50/50 hover:bg-white hover:shadow-lg transition-all group">
+                                            <div className="flex justify-between items-start mb-4">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 rounded-xl bg-white shadow-sm flex items-center justify-center text-spk-blue">
+                                                        <Tablet size={20} />
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="font-bold text-sm text-gray-800">{d.name}</h4>
+                                                        <p className="text-[10px] font-mono text-gray-400">{d.serial_number}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <button 
+                                                onClick={() => handleAction(d)}
+                                                disabled={isLoading}
+                                                className={`w-full py-3 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${mode === 'borrow' ? 'bg-spk-blue text-white hover:bg-blue-900' : 'bg-green-600 text-white hover:bg-green-700'} disabled:opacity-50`}
+                                            >
+                                                {isLoading ? <RefreshCw size={16} className="animate-spin" /> : (mode === 'borrow' ? 'ยืนยันการยืม' : 'ยืนยันการคืน')}
+                                            </button>
+                                        </div>
+                                    ))}
+                                    {filteredDevices.length === 0 && (
+                                        <div className="col-span-full py-12 text-center text-gray-400">
+                                            <Search size={48} className="mx-auto mb-4 opacity-10" />
+                                            <p>ไม่พบอุปกรณ์ที่ต้องการ</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const Registry = ({ students, onUpdate, t }) => {
+            const [searchTerm, setSearchTerm] = useState('');
+            
+            return (
+                <div className="space-y-6">
+                    <div className="flex justify-between items-center">
+                        <h2 className="text-3xl font-bold text-spk-blue">ทะเบียนรายชื่อ</h2>
+                        <button className="btn-primary py-2 px-4 text-sm flex items-center gap-2">
+                            <Plus size={18} />
+                            เพิ่มรายชื่อใหม่
+                        </button>
+                    </div>
+
+                    <div className="card border-none shadow-xl bg-white overflow-hidden">
+                        <div className="p-6 border-b border-gray-50">
+                            <div className="relative w-full sm:w-96">
+                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                                <input 
+                                    type="text" 
+                                    placeholder="ค้นหาชื่อ หรือ รหัสนักเรียน..." 
+                                    className="input-field pl-12 py-2 text-sm"
+                                    value={searchTerm}
+                                    onChange={e => setSearchTerm(e.target.value)}
+                                />
+                            </div>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left">
+                                <thead className="bg-gray-50">
+                                    <tr className="text-gray-500 text-[10px] uppercase tracking-widest font-bold">
+                                        <th className="p-6">รหัสนักเรียน</th>
+                                        <th className="p-6">ชื่อ-นามสกุล</th>
+                                        <th className="p-6">ระดับชั้น</th>
+                                        <th className="p-6">ห้อง</th>
+                                        <th className="p-6 text-right">จัดการ</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-50">
+                                    {students.filter(s => s.fullName.includes(searchTerm) || s.studentId.includes(searchTerm)).map(s => (
+                                        <tr key={s.studentId} className="hover:bg-blue-50/30 transition-colors group">
+                                            <td className="p-6 font-mono text-sm text-gray-600">{s.studentId}</td>
+                                            <td className="p-6 font-bold text-gray-800">{s.fullName}</td>
+                                            <td className="p-6 text-sm text-gray-600">{s.grade}</td>
+                                            <td className="p-6 text-sm text-gray-600">{s.classroom}</td>
+                                            <td className="p-6 text-right">
+                                                <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <button className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"><Edit2 size={16} /></button>
+                                                    <button className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"><Trash2 size={16} /></button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const RepairService = ({ devices, currentUser, onUpdate, t }) => {
+            const [repairForm, setRepairForm] = useState({ device_id: '', issue_type: '', email: '', details: '' });
+            const [repairSlip, setRepairSlip] = useState(null);
+
+            const handleRepairSubmit = (e) => {
+                e.preventDefault();
+                const slip = {
+                    repairId: 'REP-' + Math.floor(100000 + Math.random() * 900000),
+                    deviceId: repairForm.device_id,
+                    issueType: repairForm.issue_type,
+                    date: new Date().toLocaleDateString('th-TH'),
+                };
+                setRepairSlip(slip);
+            };
+
+            return (
+                <div className="space-y-8">
+                    <h2 className="text-3xl font-bold text-spk-blue">ระบบแจ้งซ่อม</h2>
+                    
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        {/* Repair Form */}
+                        <div className="card border-none shadow-xl bg-white p-8">
+                            <h3 className="font-bold text-xl mb-6 text-spk-blue flex items-center gap-2">
+                                <Settings size={24} />
+                                ข้อมูลการแจ้งซ่อม
+                            </h3>
+                            <form onSubmit={handleRepairSubmit} className="space-y-6">
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-2">เลือกอุปกรณ์</label>
+                                    <select 
+                                        className="input-field"
+                                        value={repairForm.device_id}
+                                        onChange={e => setRepairForm({...repairForm, device_id: e.target.value})}
+                                        required
+                                    >
+                                        <option value="">-- เลือกอุปกรณ์ --</option>
+                                        {devices.map(d => (
+                                            <option key={d.id} value={d.serial_number}>{d.name} ({d.serial_number})</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-2">ประเภทปัญหา</label>
+                                    <select 
+                                        className="input-field"
+                                        value={repairForm.issue_type}
+                                        onChange={e => setRepairForm({...repairForm, issue_type: e.target.value})}
+                                        required
+                                    >
+                                        <option value="">-- เลือกประเภทปัญหา --</option>
+                                        <option value="screen">หน้าจอแตก/เสียหาย</option>
+                                        <option value="battery">แบตเตอรี่เสื่อม/ไม่ชาร์จ</option>
+                                        <option value="software">ซอฟต์แวร์/ค้าง</option>
+                                        <option value="other">อื่นๆ</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-2">อีเมลผู้แจ้ง/ผู้รับผิดชอบ</label>
+                                    <input 
+                                        type="email" 
+                                        placeholder="example@email.com" 
+                                        className="input-field"
+                                        value={repairForm.email}
+                                        onChange={e => setRepairForm({...repairForm, email: e.target.value})}
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-2">รายละเอียดเพิ่มเติม</label>
+                                    <textarea 
+                                        placeholder="ระบุรายละเอียดของปัญหา..." 
+                                        className="input-field min-h-[120px] resize-none"
+                                        value={repairForm.details}
+                                        onChange={e => setRepairForm({...repairForm, details: e.target.value})}
+                                    ></textarea>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <button type="submit" className="btn-primary flex items-center justify-center gap-2">
+                                        <FileText size={18} />
+                                        บันทึก PDF
+                                    </button>
+                                    <button type="button" className="btn-primary bg-blue-500 flex items-center justify-center gap-2">
+                                        <Mail size={18} />
+                                        ส่งอีเมล
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+
+                        {/* Repair Slip Preview */}
+                        <div className="flex flex-col gap-8">
+                            {repairSlip ? (
+                                <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="card border-none shadow-2xl bg-white p-0 overflow-hidden">
+                                    <div className="bg-spk-blue p-6 text-white text-center">
+                                        <h3 className="font-bold text-xl">ใบแจ้งซ่อมอุปกรณ์</h3>
+                                        <p className="text-[10px] opacity-70 uppercase tracking-widest">Repair Notification Slip</p>
+                                    </div>
+                                    <div className="p-8 space-y-6">
+                                        <div className="flex justify-between items-center border-b border-gray-100 pb-4">
+                                            <div>
+                                                <p className="text-[10px] text-gray-400 uppercase font-bold">หมายเลขแจ้งซ่อม</p>
+                                                <p className="font-black text-spk-blue text-lg">{repairSlip.repairId}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-[10px] text-gray-400 uppercase font-bold">วันที่แจ้ง</p>
+                                                <p className="font-bold text-gray-800">{repairSlip.date}</p>
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-6">
+                                            <div>
+                                                <p className="text-[10px] text-gray-400 uppercase font-bold mb-1">รหัสอุปกรณ์</p>
+                                                <p className="font-bold text-gray-800">{repairSlip.deviceId}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-[10px] text-gray-400 uppercase font-bold mb-1">ประเภทปัญหา</p>
+                                                <p className="font-bold text-gray-800 capitalize">{repairSlip.issueType}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-col items-center justify-center py-6 bg-gray-50 rounded-3xl border border-dashed border-gray-200">
+                                            <div className="w-32 h-32 bg-white p-2 rounded-2xl shadow-sm mb-3">
+                                                <img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${repairSlip.repairId}`} className="w-full h-full" />
+                                            </div>
+                                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Scan to track status</p>
+                                        </div>
+                                    </div>
+                                    <div className="p-4 bg-gray-50 text-center">
+                                        <p className="text-[10px] text-gray-400">SPK ICT Inventory System • {new Date().getFullYear()}</p>
+                                    </div>
+                                </motion.div>
+                            ) : (
+                                <div className="card border-none shadow-xl bg-gray-50 border-2 border-dashed border-gray-200 flex flex-col items-center justify-center py-20 text-gray-400">
+                                    <FileText size={64} className="mb-4 opacity-10" />
+                                    <p>กรอกข้อมูลเพื่อสร้างใบแจ้งซ่อม</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
 
         const App = () => {
             const [isLoading, setIsLoading] = useState(true);
@@ -343,16 +983,26 @@
             const [activeTab, setActiveTab] = useState('dashboard');
             const [devices, setDevices] = useState([]);
             const [categories, setCategories] = useState([]);
+            const [students, setStudents] = useState([]);
+            const [transactions, setTransactions] = useState([]);
             const [stats, setStats] = useState({ total: 0, available: 0, borrowed: 0, maintenance: 0 });
 
             const loadData = useCallback(async () => {
                 setIsLoading(true);
-                const [dRes, cRes] = await Promise.all([gasHelper('read', 'Devices'), gasHelper('read', 'Categories')]);
+                const [dRes, cRes, sRes, tRes] = await Promise.all([
+                    gasHelper('read', 'Devices'), 
+                    gasHelper('read', 'Categories'),
+                    gasHelper('read', 'StudentsM4'),
+                    gasHelper('read', 'Transactions')
+                ]);
+                
                 if (dRes.success && cRes.success) {
                     const cats = cRes.data;
                     const devs = dRes.data.map(d => ({ ...d, name: cats.find(c => c.id === d.category_id)?.name || 'Device' }));
                     setDevices(devs);
                     setCategories(cats);
+                    setStudents(sRes.success ? sRes.data : []);
+                    setTransactions(tRes.success ? tRes.data : []);
                     setStats({
                         total: devs.length,
                         available: devs.filter(d => d.status === 'Available').length,
@@ -376,11 +1026,12 @@
 
             const renderContent = () => {
                 switch (activeTab) {
-                    case 'dashboard': return <Dashboard stats={stats} t={t} />;
-                    case 'inventory': return <Inventory devices={devices} t={t} />;
-                    case 'borrow': return <BorrowReturn devices={devices} currentUser={currentUser} onUpdate={loadData} t={t} />;
-                    case 'admin': return <AdminPanel devices={devices} categories={categories} onUpdate={loadData} t={t} />;
-                    default: return <Dashboard stats={stats} t={t} />;
+                    case 'dashboard': return <Dashboard stats={stats} transactions={transactions} t={t} />;
+                    case 'inventory': return <Inventory devices={devices} categories={categories} onUpdate={loadData} t={t} />;
+                    case 'borrow': return <BorrowReturn devices={devices} students={students} currentUser={currentUser} onUpdate={loadData} t={t} />;
+                    case 'registry': return <Registry students={students} onUpdate={loadData} t={t} />;
+                    case 'repair': return <RepairService devices={devices} currentUser={currentUser} onUpdate={loadData} t={t} />;
+                    default: return <Dashboard stats={stats} transactions={transactions} t={t} />;
                 }
             };
 
