@@ -112,7 +112,7 @@
         };
         
         // --- Environment Variables ---
-        const GAS_URL = "https://script.google.com/macros/s/AKfycbyKbjmcTwQ7MT1PEvVc3y83Rqvo69TYkCDyD5a4MRXG0xcoGPiQe8Cb7oFyvRFiGDCOhA/exec"; // ตั้งค่า URL ของ Google Apps Script ที่นี่
+        const GAS_URL = process.env.GAS_URL || "https://script.google.com/macros/s/AKfycbyKbjmcTwQ7MT1PEvVc3y83Rqvo69TYkCDyD5a4MRXG0xcoGPiQe8Cb7oFyvRFiGDCOhA/exec";
 
         // --- Lucide Icons Helper ---
         const Icon = ({ name, className, size = 24 }) => {
@@ -148,6 +148,10 @@
         const Settings = (props) => <Icon name="settings" {...props} />;
         const LogOut = (props) => <Icon name="log-out" {...props} />;
         const CheckCircle = (props) => <Icon name="check-circle" {...props} />;
+        const MessageCircle = (props) => <Icon name="message-circle" {...props} />;
+        const Globe = (props) => <Icon name="globe" {...props} />;
+        const FileWarning = (props) => <Icon name="file-warning" {...props} />;
+        const CalendarCheck = (props) => <Icon name="calendar-check" {...props} />;
         const BarChart3 = (props) => <Icon name="bar-chart-3" {...props} />;
         const TrendingUp = (props) => <Icon name="trending-up" {...props} />;
         const Clock = (props) => <Icon name="clock" {...props} />;
@@ -193,7 +197,7 @@
         };
 
         // --- Service ---
-        const gasHelper = async (action, sheetName, data) => {
+        const gasHelper = async (action, sheetName, data, currentUser = null) => {
             if (!GAS_URL || GAS_URL.includes('XXXXXXXXX')) {
                 if (action === 'login') return { success: true, user: { id: '1', users: 'admin', role: 'Admin', name: 'Admin User' } };
                 return { success: true, data: [] };
@@ -203,7 +207,7 @@
                     method: 'POST',
                     mode: 'cors',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action, sheetName, data }),
+                    body: JSON.stringify({ action, sheetName, data, currentUser }),
                 });
                 return await response.json();
             } catch (error) {
@@ -214,52 +218,196 @@
 
         // --- Components ---
 
-        const LandingPage = ({ onStart, onAdminLogin, dbConnected, categories, devices }) => {
+        const LandingPage = ({ onAdminLogin, dbStatus, categories, devices }) => {
             const [activeSection, setActiveSection] = useState('home');
-            const [isSubmitting, setIsSubmitting] = useState(false);
-            const [submitSuccess, setSubmitSuccess] = useState(false);
-            const [isScannerOpen, setIsScannerOpen] = useState(false);
-            const [reportForm, setReportForm] = useState({ device_id: '', issue_type: '', details: '' });
-
-            const handleReportSubmit = async (e) => {
-                e.preventDefault();
-                setIsSubmitting(true);
-                const res = await gasHelper('append', 'Service', { ...reportForm, report_date: new Date().toLocaleString('th-TH'), status: 'Pending' });
-                if (res.success) {
-                    setSubmitSuccess(true);
-                    setReportForm({ device_id: '', issue_type: '', details: '' });
-                }
-                setIsSubmitting(false);
-            };
+            const [showRules, setShowRules] = useState(false);
 
             const renderSection = () => {
                 if (activeSection === 'home') return (
-                    <div className="pt-20">
+                    <div className="pt-20 pb-32">
                         <div className="text-center mb-20">
-                            <h1 className="text-4xl md:text-7xl font-black text-white mb-8 leading-tight flex flex-col items-center gap-6">
-                                <div className="flex items-center gap-6 mb-2">
-                                    <img src="https://www.spk.ac.th/home/wp-content/uploads/2025/10/spk-logo-png-new-1.png" className="w-20 h-20 md:w-28 md:h-28" />
-                                    <span>ระบบยืมอุปกรณ์</span>
-                                </div>
-                                <span className="text-transparent bg-clip-text bg-gradient-to-r from-spk-yellow via-white to-spk-yellow bg-[length:200%_auto] animate-gradient">Apple iPad เพื่อการศึกษา</span>
-                            </h1>
-                            <button onClick={onStart} className="btn-primary bg-spk-yellow text-spk-blue px-12 py-6 rounded-2xl font-black text-xl shadow-xl">เริ่มต้นใช้งาน</button>
+                            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }}>
+                                <h1 className="text-4xl md:text-7xl font-black text-white mb-8 leading-tight flex flex-col items-center gap-6">
+                                    <div className="flex items-center gap-6 mb-2">
+                                        <img src="https://www.spk.ac.th/home/wp-content/uploads/2025/10/spk-logo-png-new-1.png" className="w-20 h-20 md:w-28 md:h-28" />
+                                        <span>ระบบยืมอุปกรณ์</span>
+                                    </div>
+                                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-spk-yellow via-white to-spk-yellow bg-[length:200%_auto] animate-gradient">Apple iPad เพื่อการศึกษา</span>
+                                </h1>
+                                <p className="text-gray-400 text-lg md:text-xl max-w-2xl mx-auto mb-12">
+                                    ศูนย์ ICT โรงเรียนสารคามพิทยาคม มุ่งเน้นการใช้เทคโนโลยีเพื่อการเรียนรู้ที่ทันสมัย
+                                </p>
+                                <button onClick={() => setActiveSection('categories')} className="btn-primary bg-spk-yellow text-spk-blue px-12 py-6 rounded-2xl font-black text-xl shadow-xl hover:scale-105 transition-transform">
+                                    เริ่มต้นใช้งาน
+                                </button>
+                            </motion.div>
                         </div>
                     </div>
                 );
-                return <div className="text-white p-20 text-center">Section {activeSection} Content...</div>;
+
+                if (activeSection === 'categories') return (
+                    <div className="pt-10 pb-32">
+                        <div className="flex items-center gap-4 mb-12">
+                            <button onClick={() => setActiveSection('home')} className="p-3 bg-white/5 hover:bg-white/10 rounded-2xl transition-colors">
+                                <ArrowLeft size={24} />
+                            </button>
+                            <h2 className="text-3xl font-bold">หมวดหมู่สินค้าในคลัง</h2>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                            {categories.map(cat => (
+                                <motion.div 
+                                    key={cat.id} 
+                                    initial={{ opacity: 0, scale: 0.9 }} 
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    className="card bg-white/5 border-white/10 p-8 hover:bg-white/10 transition-all group"
+                                >
+                                    <div className="w-full aspect-video rounded-2xl bg-slate-900 mb-6 overflow-hidden">
+                                        <img 
+                                            src={cat.imageUrl || `https://picsum.photos/seed/${cat.id}/400/225`} 
+                                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                                            referrerPolicy="no-referrer"
+                                        />
+                                    </div>
+                                    <h3 className="text-xl font-bold mb-2">{cat.name}</h3>
+                                    <p className="text-gray-400 text-sm mb-4">{cat.description || 'ไม่มีรายละเอียดเพิ่มเติม'}</p>
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-xs font-bold px-3 py-1 bg-spk-yellow/20 text-spk-yellow rounded-full">
+                                            {cat.designatedFor === 'Student' ? 'สำหรับนักเรียน' : 'สำหรับครู'}
+                                        </span>
+                                        <span className="text-xs text-gray-500">
+                                            {devices.filter(d => d.category_id === cat.id).length} เครื่องในระบบ
+                                        </span>
+                                    </div>
+                                </motion.div>
+                            ))}
+                        </div>
+                    </div>
+                );
+
+                return null;
             };
 
             return (
-                <div className="min-h-screen bg-slate-950 text-white relative overflow-hidden">
-                    <header className="fixed top-0 left-0 right-0 z-50 bg-slate-950/50 backdrop-blur-xl border-b border-white/5 p-6 flex justify-between items-center">
-                        <div className="flex items-center gap-3">
+                <div className="min-h-screen bg-slate-950 text-white relative overflow-hidden flex flex-col">
+                    <header className="fixed top-0 left-0 right-0 z-50 bg-slate-950/80 backdrop-blur-xl border-b border-white/5 p-6 flex justify-between items-center">
+                        <div className="flex items-center gap-3 cursor-pointer" onClick={() => setActiveSection('home')}>
                             <Tablet className="text-white w-6 h-6" />
                             <span className="font-bold text-xl">iPad Check</span>
                         </div>
-                        <button onClick={onAdminLogin} className="btn-primary py-2 px-4 text-sm">เข้าระบบ</button>
+                        <div className="flex items-center gap-6">
+                            {/* Live Status Indicator */}
+                            <div className="hidden md:flex items-center gap-3 bg-white/5 px-4 py-2 rounded-2xl border border-white/10">
+                                <div className={`w-2.5 h-2.5 rounded-full animate-pulse ${
+                                    dbStatus === 'connected' ? 'bg-green-500 shadow-[0_0_10px_#22c55e]' : 
+                                    dbStatus === 'error' ? 'bg-red-500 shadow-[0_0_10px_#ef4444]' : 
+                                    'bg-gray-400'
+                                }`}></div>
+                                <span className="text-xs font-bold">
+                                    {dbStatus === 'connected' ? '🟢 เชื่อมต่อ' : 
+                                     dbStatus === 'error' ? '🔴 ขัดข้อง' : 
+                                     '⚪ กำลังตรวจสอบ...'}
+                                </span>
+                            </div>
+                            <button onClick={onAdminLogin} className="btn-primary py-2 px-6 text-sm bg-white text-slate-950 hover:bg-gray-200">เข้าระบบ</button>
+                        </div>
                     </header>
-                    <main className="pt-48 px-6 max-w-7xl mx-auto">{renderSection()}</main>
+
+                    <main className="pt-32 px-6 max-w-7xl mx-auto flex-grow w-full">
+                        {renderSection()}
+                    </main>
+
+                    {/* Footer */}
+                    <footer className="bg-slate-900/50 border-t border-white/5 pt-16 pb-8 px-6">
+                        <div className="max-w-7xl mx-auto">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-12 mb-16">
+                                <div className="space-y-4">
+                                    <div className="flex items-center gap-3">
+                                        <img src="https://www.spk.ac.th/home/wp-content/uploads/2025/10/spk-logo-png-new-1.png" className="w-12 h-12" />
+                                        <div>
+                                            <h3 className="font-bold text-lg">iPad Check System</h3>
+                                            <p className="text-xs text-gray-400">โรงเรียนสารคามพิทยาคม</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-4 pt-4">
+                                        <a href="#" className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-blue-600 transition-colors"><Facebook size={20} /></a>
+                                        <a href="#" className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-green-600 transition-colors"><MessageCircle size={20} /></a>
+                                        <a href="#" className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-spk-yellow hover:text-spk-blue transition-colors"><Phone size={20} /></a>
+                                    </div>
+                                </div>
+                                <div className="flex flex-col items-center justify-center gap-6">
+                                    <button onClick={() => setShowRules(true)} className="text-gray-400 hover:text-white transition-colors font-medium">ระเบียบการยืม</button>
+                                    <a href="https://www.spk.ac.th" target="_blank" className="text-gray-400 hover:text-white transition-colors font-medium">ติดต่อสอบถาม</a>
+                                </div>
+                                <div className="text-right flex flex-col justify-center">
+                                    <p className="text-sm text-gray-400">© 2026 ศูนย์ ไอซีที โรงเรียนสารคามพิทยาคม</p>
+                                    <p className="text-[10px] text-gray-600 uppercase tracking-widest mt-2">Modern Education Technology</p>
+                                </div>
+                            </div>
+                        </div>
+                    </footer>
+
+                    {/* Rules Modal */}
+                    <AnimatePresence>
+                        {showRules && (
+                            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                                <motion.div 
+                                    initial={{ opacity: 0 }} 
+                                    animate={{ opacity: 1 }} 
+                                    exit={{ opacity: 0 }}
+                                    onClick={() => setShowRules(false)}
+                                    className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+                                />
+                                <motion.div 
+                                    initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                                    exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                                    className="relative bg-slate-900 border border-white/10 rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden"
+                                >
+                                    <div className="p-8 border-b border-white/5 flex justify-between items-center">
+                                        <div>
+                                            <h3 className="text-2xl font-bold flex items-center gap-3">
+                                                <FileWarning className="text-spk-yellow" />
+                                                ระเบียบการยืมใช้งาน
+                                            </h3>
+                                            <p className="text-xs text-gray-400 mt-1">ข้อกำหนดและเงื่อนไขในการใช้บริการยืม-คืนเครื่อง iPad</p>
+                                        </div>
+                                        <button onClick={() => setShowRules(false)} className="p-2 hover:bg-white/5 rounded-xl transition-colors">
+                                            <X size={24} />
+                                        </button>
+                                    </div>
+                                    <div className="p-8 space-y-6 max-h-[60vh] overflow-y-auto custom-scrollbar">
+                                        {[
+                                            { id: 1, title: 'คุณสมบัติผู้ยืม', desc: 'ต้องเป็นนักเรียนหรือบุคลากรของโรงเรียนสารคามพิทยาคมที่มีสถานะปกติ', icon: <Users size={20} /> },
+                                            { id: 2, title: 'ระยะเวลาการยืม', desc: 'สามารถยืมได้สูงสุด 3 ปี หรือจนกว่าจะจบ ม.6 หากต้องการต่ออายุต้องนำเครื่องมาตรวจสอบ', icon: <CalendarCheck size={20} /> },
+                                            { id: 3, title: 'การดูแลรักษา', desc: 'ผู้ยืมต้องดูแลรักษาเครื่องให้อยู่ในสภาพดี ห้ามแกะสติกเกอร์หรือดัดแปลงซอฟต์แวร์', icon: <ShieldCheck size={20} /> },
+                                            { id: 4, title: 'กรณีชำรุดหรือสูญหาย', desc: 'ผู้ยืมต้องรับผิดชอบค่าใช้จ่ายในการซ่อมแซมหรือชดใช้ตามมูลค่าปัจจุบันของอุปกรณ์', icon: <AlertCircle size={20} /> },
+                                            { id: 5, title: 'การส่งคืน', desc: 'ต้องส่งคืนเครื่องพร้อมอุปกรณ์เสริมครบชุดตามกำหนดเวลา ณ ศูนย์ ICT', icon: <ArrowRightLeft size={20} /> },
+                                        ].map(item => (
+                                            <div key={item.id} className="flex gap-6 p-4 rounded-2xl bg-white/5 border border-white/5">
+                                                <div className="w-12 h-12 rounded-xl bg-spk-yellow/10 flex items-center justify-center text-spk-yellow shrink-0 font-black text-xl">
+                                                    {item.id}
+                                                </div>
+                                                <div>
+                                                    <h4 className="font-bold text-white mb-1 flex items-center gap-2">
+                                                        {item.icon}
+                                                        {item.title}
+                                                    </h4>
+                                                    <p className="text-sm text-gray-400 leading-relaxed">{item.desc}</p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="p-8 bg-slate-950/50 flex flex-col items-center gap-4">
+                                        <p className="text-sm text-gray-400">หากมีข้อสงสัยเพิ่มเติม กรุณาติดต่อเจ้าหน้าที่</p>
+                                        <button className="btn-primary bg-spk-yellow text-spk-blue px-8 py-3 rounded-xl font-bold flex items-center gap-2">
+                                            <MessageCircle size={18} />
+                                            ติดต่อศูนย์ ICT
+                                        </button>
+                                    </div>
+                                </motion.div>
+                            </div>
+                        )}
+                    </AnimatePresence>
                 </div>
             );
         };
@@ -290,7 +438,7 @@
         };
 
         const Layout = ({ children, currentUser, activeTab, setActiveTab, onLogout, t }) => (
-            <div className="min-h-screen bg-spk-gray">
+            <div className="min-h-screen bg-spk-gray flex flex-col">
                 <nav className="bg-spk-blue text-white shadow-lg">
                     {/* Row 1: Brand and User */}
                     <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center border-b border-white/10">
@@ -337,7 +485,14 @@
                         </div>
                     </div>
                 </nav>
-                <main className="p-4 md:p-8 max-w-7xl mx-auto">{children}</main>
+                <main className="p-4 md:p-8 max-w-7xl mx-auto flex-grow">{children}</main>
+                <footer className="bg-white border-t border-gray-200 py-8 px-4">
+                    <div className="max-w-7xl mx-auto text-center space-y-2">
+                        <p className="font-bold text-spk-blue">โรงเรียนสารคามพิทยาคม</p>
+                        <p className="text-xs text-gray-500">© 2026 ศูนย์ ไอซีที โรงเรียนสารคามพิทยาคม</p>
+                        <p className="text-[10px] text-gray-400 uppercase tracking-widest">Modern Education Technology</p>
+                    </div>
+                </footer>
             </div>
         );
 
@@ -437,12 +592,35 @@
             </div>
         );
 
-        const Inventory = ({ devices, categories, onUpdate, t }) => {
+        const Inventory = ({ devices, categories, currentUser, onUpdate, t }) => {
             const [currentPage, setCurrentPage] = useState(1);
             const [searchTerm, setSearchTerm] = useState('');
             const [filterStatus, setFilterStatus] = useState('all');
             const [showAdminMenu, setShowAdminMenu] = useState(false);
+            const [showImportModal, setShowImportModal] = useState(false);
+            const [importJson, setImportJson] = useState('');
+            const [isImporting, setIsImporting] = useState(false);
+            const [importResult, setImportResult] = useState(null);
             const itemsPerPage = 31;
+
+            const handleImport = async () => {
+                if (!importJson.trim()) return;
+                setIsImporting(true);
+                try {
+                    const data = JSON.parse(importJson);
+                    const res = await gasHelper('importTransactions', 'Transactions', data, currentUser);
+                    if (res.success) {
+                        setImportResult(res);
+                        onUpdate();
+                    } else {
+                        alert('นำเข้าข้อมูลไม่สำเร็จ: ' + res.message);
+                    }
+                } catch (e) {
+                    alert('รูปแบบ JSON ไม่ถูกต้อง: ' + e.message);
+                } finally {
+                    setIsImporting(false);
+                }
+            };
 
             const filteredDevices = devices.filter(d => {
                 const matchesSearch = d.name.toLowerCase().includes(searchTerm.toLowerCase()) || d.serial_number.toLowerCase().includes(searchTerm.toLowerCase());
@@ -462,12 +640,79 @@
                                 <Settings size={18} />
                                 จัดการข้อมูล
                             </button>
+                            <button onClick={() => setShowImportModal(true)} className="btn-primary py-2 px-4 text-sm flex items-center gap-2 bg-blue-500 text-white">
+                                <Send size={18} />
+                                นำเข้าข้อมูล
+                            </button>
                             <button className="btn-primary py-2 px-4 text-sm flex items-center gap-2">
                                 <FileText size={18} />
                                 ปรินท์เอกสาร
                             </button>
                         </div>
                     </div>
+
+                    {showImportModal && (
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden">
+                                <div className="p-6 bg-spk-blue text-white flex justify-between items-center">
+                                    <h3 className="text-xl font-bold flex items-center gap-2">
+                                        <Send size={24} />
+                                        นำเข้าข้อมูล (JSON / Google Sheet)
+                                    </h3>
+                                    <button onClick={() => { setShowImportModal(false); setImportResult(null); }} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                                        <X size={24} />
+                                    </button>
+                                </div>
+                                <div className="p-6 space-y-4">
+                                    {!importResult ? (
+                                        <>
+                                            <p className="text-sm text-gray-600">วางข้อมูล JSON ของรายการยืม-คืน (Transactions) ในช่องด้านล่าง:</p>
+                                            <textarea 
+                                                className="input-field min-h-[200px] font-mono text-xs"
+                                                placeholder='[{"fid": "12345", "fname": "ชื่อ-นามสกุล", "serial_number": "SN001", ...}]'
+                                                value={importJson}
+                                                onChange={e => setImportJson(e.target.value)}
+                                            ></textarea>
+                                            <div className="flex justify-end gap-3">
+                                                <button onClick={() => setShowImportModal(false)} className="px-6 py-2 rounded-xl border border-gray-200 font-bold text-gray-600 hover:bg-gray-50">ยกเลิก</button>
+                                                <button 
+                                                    onClick={handleImport}
+                                                    disabled={isImporting || !importJson.trim()}
+                                                    className="px-6 py-2 rounded-xl bg-spk-blue text-white font-bold hover:bg-blue-900 disabled:opacity-50 flex items-center gap-2"
+                                                >
+                                                    {isImporting ? <RefreshCw size={18} className="animate-spin" /> : <Plus size={18} />}
+                                                    เริ่มนำเข้าข้อมูล
+                                                </button>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <div className="text-center py-8 space-y-4">
+                                            <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto ${importResult.failCount === 0 ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'}`}>
+                                                <CheckCircle size={32} />
+                                            </div>
+                                            <h4 className="text-2xl font-bold text-gray-800">นำเข้าข้อมูลเสร็จสิ้น</h4>
+                                            <div className="grid grid-cols-2 gap-4 max-w-sm mx-auto">
+                                                <div className="p-4 bg-green-50 rounded-2xl border border-green-100">
+                                                    <p className="text-xs text-green-600 font-bold uppercase">สำเร็จ</p>
+                                                    <p className="text-3xl font-black text-green-700">{importResult.successCount}</p>
+                                                </div>
+                                                <div className="p-4 bg-red-50 rounded-2xl border border-red-100">
+                                                    <p className="text-xs text-red-600 font-bold uppercase">ล้มเหลว</p>
+                                                    <p className="text-3xl font-black text-red-700">{importResult.failCount}</p>
+                                                </div>
+                                            </div>
+                                            {importResult.errors && importResult.errors.length > 0 && (
+                                                <div className="text-left bg-gray-50 p-4 rounded-xl max-h-[150px] overflow-y-auto text-xs text-red-500 font-mono">
+                                                    {importResult.errors.map((err, i) => <p key={i}>{err}</p>)}
+                                                </div>
+                                            )}
+                                            <button onClick={() => { setShowImportModal(false); setImportResult(null); setImportJson(''); }} className="btn-primary w-full max-w-xs mx-auto">ปิดหน้าต่าง</button>
+                                        </div>
+                                    )}
+                                </div>
+                            </motion.div>
+                        </div>
+                    )}
 
                     {showAdminMenu && (
                         <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-4 bg-white rounded-3xl shadow-lg border border-blue-50">
@@ -528,20 +773,26 @@
                                 </thead>
                                 <tbody className="divide-y divide-gray-50">
                                     {currentDevices.map(d => (
-                                        <tr key={d.id} className="hover:bg-blue-50/30 transition-colors group">
+                                        <tr key={d.serial_number} className="hover:bg-blue-50/30 transition-colors group">
                                             <td className="p-6">
                                                 <div className="flex items-center gap-4">
                                                     <div className="w-12 h-12 rounded-xl bg-gray-100 overflow-hidden shrink-0">
-                                                        <img src={d.imageUrl || 'https://picsum.photos/seed/'+d.id+'/100/100'} className="w-full h-full object-cover" />
+                                                        <img src={d.imageUrl || d.categoryImageUrl || `https://picsum.photos/seed/${d.serial_number}/100/100`} className="w-full h-full object-cover" />
                                                     </div>
                                                     <div>
                                                         <p className="font-bold text-sm text-gray-800">{d.name}</p>
                                                         <p className="text-[10px] font-mono text-gray-400">{d.serial_number}</p>
+                                                        {d.description && <p className="text-[10px] text-gray-500 mt-1 line-clamp-1 max-w-[200px]">{d.description}</p>}
                                                     </div>
                                                 </div>
                                             </td>
                                             <td className="p-6">
-                                                <span className="text-xs font-medium text-gray-600 bg-gray-100 px-3 py-1 rounded-full">{categories.find(c => c.id === d.category_id)?.name || 'N/A'}</span>
+                                                <div className="flex flex-col gap-1">
+                                                    <span className="text-xs font-medium text-gray-600 bg-gray-100 px-3 py-1 rounded-full w-fit">{categories.find(c => c.id === d.category_id)?.name || 'N/A'}</span>
+                                                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded uppercase tracking-wider w-fit ${d.designatedFor === 'Teacher' ? 'bg-purple-100 text-purple-700' : d.designatedFor === 'Student' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-500'}`}>
+                                                        {d.designatedFor === 'Teacher' ? 'สำหรับครู' : d.designatedFor === 'Student' ? 'สำหรับนักเรียน' : 'ทั่วไป'}
+                                                    </span>
+                                                </div>
                                             </td>
                                             <td className="p-6">
                                                 <p className="text-sm text-gray-600">{d.status === 'Borrowed' ? 'นักเรียน ม.4/1' : '-'}</p>
@@ -598,6 +849,7 @@
             const [serialSearch, setSerialSearch] = useState('');
             const [isLoading, setIsLoading] = useState(false);
             const [isScannerOpen, setIsScannerOpen] = useState(false);
+            const [borrowForm, setBorrowForm] = useState({ email: '', notes: '' });
 
             const filteredStudents = students.filter(s => 
                 s.fullName.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -624,16 +876,20 @@
                     fid: selectedStudent,
                     fname: student?.fullName || '',
                     serial_number: device.serial_number,
-                    borrow_date: mode === 'borrow' ? new Date().toLocaleDateString('th-TH') : '',
+                    borrowDate: mode === 'borrow' ? new Date().toLocaleDateString('th-TH') : '',
                     borrowTime: mode === 'borrow' ? new Date().toLocaleTimeString('th-TH') : '',
+                    due_date: '', // Will be handled by backend or calculated here
                     return_date: mode === 'return' ? new Date().toLocaleDateString('th-TH') : '',
-                    status: mode === 'borrow' ? 'Borrowed' : 'Returned',
-                    recorder: currentUser.name
+                    emailId: borrowForm.email || 'ยังไม่ระบุ',
+                    borrowNotes: borrowForm.notes || 'ยังไม่ระบุ',
+                    defaultAccessories: 'ยังไม่ระบุ',
+                    recorder: currentUser.name,
+                    status: mode === 'borrow' ? 'Borrowed' : 'Returned'
                 };
 
                 try {
-                    const res = await gasHelper(mode === 'borrow' ? 'append' : 'update', 'Transactions', transactionData);
-                    const devRes = await gasHelper('update', 'Devices', { id: device.id, status: mode === 'borrow' ? 'Borrowed' : 'Available' });
+                    const res = await gasHelper(mode === 'borrow' ? 'append' : 'update', 'Transactions', transactionData, currentUser);
+                    const devRes = await gasHelper('update', 'Devices', { serial_number: device.serial_number, status: mode === 'borrow' ? 'Borrowed' : 'Available' }, currentUser);
 
                     if (res.success && devRes.success) {
                         alert(mode === 'borrow' ? 'บันทึกการยืมสำเร็จ' : 'บันทึกการคืนสำเร็จ');
@@ -685,6 +941,29 @@
                                             </button>
                                         ))}
                                     </div>
+                                    {selectedStudent && (
+                                        <div className="mt-4 space-y-3 pt-4 border-t border-gray-100">
+                                            <div>
+                                                <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">อีเมลผู้ยืม</label>
+                                                <input 
+                                                    type="email" 
+                                                    placeholder="example@email.com" 
+                                                    className="input-field py-2 text-xs"
+                                                    value={borrowForm.email}
+                                                    onChange={e => setBorrowForm({...borrowForm, email: e.target.value})}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">หมายเหตุ</label>
+                                                <textarea 
+                                                    placeholder="ระบุหมายเหตุการยืม..." 
+                                                    className="input-field py-2 text-xs min-h-[60px] resize-none"
+                                                    value={borrowForm.notes}
+                                                    onChange={e => setBorrowForm({...borrowForm, notes: e.target.value})}
+                                                ></textarea>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                             
@@ -740,15 +1019,19 @@
 
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     {filteredDevices.map(d => (
-                                        <div key={d.id} className="p-4 rounded-3xl border border-gray-100 bg-gray-50/50 hover:bg-white hover:shadow-lg transition-all group">
+                                        <div key={d.serial_number} className="p-4 rounded-3xl border border-gray-100 bg-gray-50/50 hover:bg-white hover:shadow-lg transition-all group">
                                             <div className="flex justify-between items-start mb-4">
                                                 <div className="flex items-center gap-3">
-                                                    <div className="w-10 h-10 rounded-xl bg-white shadow-sm flex items-center justify-center text-spk-blue">
-                                                        <Tablet size={20} />
+                                                    <div className="w-12 h-12 rounded-xl bg-white shadow-sm overflow-hidden flex items-center justify-center text-spk-blue shrink-0">
+                                                        <img src={d.imageUrl || d.categoryImageUrl || ''} className="w-full h-full object-cover" onError={(e) => e.target.style.display='none'} />
+                                                        <Tablet size={20} className="absolute" />
                                                     </div>
                                                     <div>
                                                         <h4 className="font-bold text-sm text-gray-800">{d.name}</h4>
                                                         <p className="text-[10px] font-mono text-gray-400">{d.serial_number}</p>
+                                                        <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${d.designatedFor === 'Teacher' ? 'bg-purple-100 text-purple-700' : d.designatedFor === 'Student' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-500'}`}>
+                                                            {d.designatedFor === 'Teacher' ? 'ครู' : d.designatedFor === 'Student' ? 'นักเรียน' : 'ทั่วไป'}
+                                                        </span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -838,16 +1121,93 @@
         const RepairService = ({ devices, currentUser, onUpdate, t }) => {
             const [repairForm, setRepairForm] = useState({ device_id: '', issue_type: '', email: '', details: '' });
             const [repairSlip, setRepairSlip] = useState(null);
+            const [isSubmitting, setIsSubmitting] = useState(false);
+            const [file, setFile] = useState(null);
+            const [uploadStatus, setUploadStatus] = useState('');
 
-            const handleRepairSubmit = (e) => {
+            const handleFileChange = (e) => {
+                const selectedFile = e.target.files[0];
+                if (selectedFile) {
+                    setFile(selectedFile);
+                }
+            };
+
+            const handleRepairSubmit = async (e) => {
                 e.preventDefault();
-                const slip = {
-                    repairId: 'REP-' + Math.floor(100000 + Math.random() * 900000),
-                    deviceId: repairForm.device_id,
-                    issueType: repairForm.issue_type,
-                    date: new Date().toLocaleDateString('th-TH'),
-                };
-                setRepairSlip(slip);
+                setIsSubmitting(true);
+                setUploadStatus('กำลังบันทึกข้อมูล...');
+
+                try {
+                    let photoUrl = '';
+                    if (file) {
+                        setUploadStatus('กำลังอัปโหลดรูปภาพ...');
+                        const reader = new FileReader();
+                        const base64Promise = new Promise((resolve) => {
+                            reader.onload = () => resolve(reader.result.split(',')[1]);
+                            reader.readAsDataURL(file);
+                        });
+                        const base64 = await base64Promise;
+                        
+                        const uploadRes = await gasHelper('uploadFile', null, {
+                            base64,
+                            mimeType: file.type,
+                            fileName: `repair_${Date.now()}_${file.name}`
+                        }, currentUser);
+                        
+                        if (uploadRes.success) {
+                            photoUrl = uploadRes.url;
+                        }
+                    }
+
+                    const slipId = 'REP-' + Math.floor(100000 + Math.random() * 900000);
+                    const slipData = {
+                        repairId: slipId,
+                        deviceId: repairForm.device_id,
+                        issueType: repairForm.issue_type,
+                        date: new Date().toLocaleDateString('th-TH'),
+                        email: repairForm.email,
+                        details: repairForm.details,
+                        photoUrl: photoUrl,
+                        userName: currentUser.name
+                    };
+
+                    // Save to Spreadsheet (Service sheet)
+                    await gasHelper('append', 'Service', {
+                        id: slipId,
+                        device_id: repairForm.device_id,
+                        issue_type: repairForm.issue_type,
+                        details: repairForm.details,
+                        email: repairForm.email,
+                        photo_url: photoUrl,
+                        report_date: new Date().toLocaleString('th-TH'),
+                        status: 'Pending'
+                    }, currentUser);
+
+                    setRepairSlip(slipData);
+                    setUploadStatus('บันทึกข้อมูลสำเร็จ');
+                } catch (error) {
+                    console.error(error);
+                    setUploadStatus('เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+                } finally {
+                    setIsSubmitting(false);
+                }
+            };
+
+            const handleSendEmail = async () => {
+                if (!repairSlip) return;
+                setIsSubmitting(true);
+                setUploadStatus('กำลังส่งอีเมลและสร้าง PDF...');
+                
+                const res = await gasHelper('sendRepairEmail', null, repairSlip, currentUser);
+                if (res.success) {
+                    setUploadStatus('ส่งอีเมลและบันทึก PDF สำเร็จแล้ว');
+                    if (res.pdfUrl) {
+                        window.open(res.pdfUrl, '_blank');
+                    }
+                } else {
+                    setUploadStatus('ส่งอีเมลไม่สำเร็จ: ' + res.message);
+                }
+                setIsSubmitting(false);
             };
 
             return (
@@ -872,7 +1232,7 @@
                                     >
                                         <option value="">-- เลือกอุปกรณ์ --</option>
                                         {devices.map(d => (
-                                            <option key={d.id} value={d.serial_number}>{d.name} ({d.serial_number})</option>
+                                            <option key={d.serial_number} value={d.serial_number}>{d.name} ({d.serial_number})</option>
                                         ))}
                                     </select>
                                 </div>
@@ -903,6 +1263,19 @@
                                     />
                                 </div>
                                 <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-2">รูปภาพเครื่องก่อนซ่อม</label>
+                                    <div className="flex items-center justify-center w-full">
+                                        <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-2xl cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors">
+                                            <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                                                <Camera className="w-8 h-8 mb-3 text-gray-400" />
+                                                <p className="mb-2 text-sm text-gray-500"><span className="font-semibold">คลิกเพื่ออัปโหลด</span> หรือลากไฟล์มาวาง</p>
+                                                <p className="text-xs text-gray-400">{file ? file.name : 'PNG, JPG (สูงสุด 10MB)'}</p>
+                                            </div>
+                                            <input type="file" className="hidden" onChange={handleFileChange} accept="image/*" />
+                                        </label>
+                                    </div>
+                                </div>
+                                <div>
                                     <label className="block text-sm font-bold text-gray-700 mb-2">รายละเอียดเพิ่มเติม</label>
                                     <textarea 
                                         placeholder="ระบุรายละเอียดของปัญหา..." 
@@ -911,12 +1284,22 @@
                                         onChange={e => setRepairForm({...repairForm, details: e.target.value})}
                                     ></textarea>
                                 </div>
+                                {uploadStatus && (
+                                    <div className={`p-3 rounded-xl text-xs font-bold text-center ${uploadStatus.includes('สำเร็จ') ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+                                        {uploadStatus}
+                                    </div>
+                                )}
                                 <div className="grid grid-cols-2 gap-4">
-                                    <button type="submit" className="btn-primary flex items-center justify-center gap-2">
+                                    <button type="submit" disabled={isSubmitting} className="btn-primary flex items-center justify-center gap-2 disabled:opacity-50">
                                         <FileText size={18} />
-                                        บันทึก PDF
+                                        {isSubmitting ? 'กำลังบันทึก...' : 'บันทึกข้อมูล'}
                                     </button>
-                                    <button type="button" className="btn-primary bg-blue-500 flex items-center justify-center gap-2">
+                                    <button 
+                                        type="button" 
+                                        onClick={handleSendEmail}
+                                        disabled={!repairSlip || isSubmitting} 
+                                        className="btn-primary bg-blue-500 flex items-center justify-center gap-2 disabled:opacity-50"
+                                    >
                                         <Mail size={18} />
                                         ส่งอีเมล
                                     </button>
@@ -980,6 +1363,7 @@
             const [isLoading, setIsLoading] = useState(true);
             const [currentUser, setCurrentUser] = useState(null);
             const [showLogin, setShowLogin] = useState(false);
+            const [dbStatus, setDbStatus] = useState('checking');
             const [activeTab, setActiveTab] = useState('dashboard');
             const [devices, setDevices] = useState([]);
             const [categories, setCategories] = useState([]);
@@ -990,15 +1374,25 @@
             const loadData = useCallback(async () => {
                 setIsLoading(true);
                 const [dRes, cRes, sRes, tRes] = await Promise.all([
-                    gasHelper('read', 'Devices'), 
-                    gasHelper('read', 'Categories'),
-                    gasHelper('read', 'StudentsM4'),
-                    gasHelper('read', 'Transactions')
+                    gasHelper('read', 'Devices', null, currentUser), 
+                    gasHelper('read', 'Categories', null, currentUser),
+                    gasHelper('read', 'StudentsM4', null, currentUser),
+                    gasHelper('read', 'Transactions', null, currentUser)
                 ]);
                 
                 if (dRes.success && cRes.success) {
+                    setDbStatus('connected');
                     const cats = cRes.data;
-                    const devs = dRes.data.map(d => ({ ...d, name: cats.find(c => c.id === d.category_id)?.name || 'Device' }));
+                    const devs = dRes.data.map(d => {
+                        const cat = cats.find(c => c.id === d.category_id) || {};
+                        return { 
+                            ...d, 
+                            name: cat.name || 'Device',
+                            description: cat.description || '',
+                            designatedFor: cat.designatedFor || 'All',
+                            categoryImageUrl: cat.imageUrl || ''
+                        };
+                    });
                     setDevices(devs);
                     setCategories(cats);
                     setStudents(sRes.success ? sRes.data : []);
@@ -1009,9 +1403,11 @@
                         borrowed: devs.filter(d => d.status === 'Borrowed').length,
                         maintenance: devs.filter(d => d.status === 'Maintenance').length
                     });
+                } else {
+                    setDbStatus('error');
                 }
                 setIsLoading(false);
-            }, []);
+            }, [currentUser]);
 
             useEffect(() => { loadData(); }, [loadData]);
 
@@ -1021,13 +1417,13 @@
 
             if (!currentUser) {
                 if (showLogin) return <Login onLogin={user => setCurrentUser(user)} onBack={() => setShowLogin(false)} t={t} />;
-                return <LandingPage onStart={() => setShowLogin(true)} onAdminLogin={() => setShowLogin(true)} categories={categories} devices={devices} />;
+                return <LandingPage onAdminLogin={() => setShowLogin(true)} dbStatus={dbStatus} categories={categories} devices={devices} />;
             }
 
             const renderContent = () => {
                 switch (activeTab) {
                     case 'dashboard': return <Dashboard stats={stats} transactions={transactions} t={t} />;
-                    case 'inventory': return <Inventory devices={devices} categories={categories} onUpdate={loadData} t={t} />;
+                    case 'inventory': return <Inventory devices={devices} categories={categories} currentUser={currentUser} onUpdate={loadData} t={t} />;
                     case 'borrow': return <BorrowReturn devices={devices} students={students} currentUser={currentUser} onUpdate={loadData} t={t} />;
                     case 'registry': return <Registry students={students} onUpdate={loadData} t={t} />;
                     case 'repair': return <RepairService devices={devices} currentUser={currentUser} onUpdate={loadData} t={t} />;
