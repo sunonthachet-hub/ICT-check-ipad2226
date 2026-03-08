@@ -205,14 +205,15 @@
                 return { success: true, data: [] };
             }
             try {
+                // ใช้ POST แบบไม่ส่ง Header Content-Type เพื่อเลี่ยง CORS Preflight (OPTIONS) ที่ GAS ไม่รองรับ
                 const response = await fetch(GAS_URL, {
                     method: 'POST',
-                    mode: 'cors',
-                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ action, sheetName, data, currentUser }),
                 });
-                return await response.json();
+                const result = await response.json();
+                return result;
             } catch (error) {
+                console.error('GAS Error:', error);
                 if (action === 'login') return { success: true, user: { id: '1', users: 'admin', role: 'Admin', name: 'Admin User' } };
                 return { success: false, error: error.message };
             }
@@ -1062,19 +1063,33 @@
 
         const Registry = ({ students, onUpdate, t }) => {
             const [searchTerm, setSearchTerm] = useState('');
+            const [selectedLevel, setSelectedLevel] = useState('M4');
             
+            const filteredStudents = students.filter(s => {
+                const matchesSearch = s.fullName.includes(searchTerm) || s.studentId.includes(searchTerm);
+                const matchesLevel = s.grade == selectedLevel.replace('M', '');
+                return matchesSearch && matchesLevel;
+            });
+
             return (
                 <div className="space-y-6">
-                    <div className="flex justify-between items-center">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                         <h2 className="text-3xl font-bold text-spk-blue">ทะเบียนรายชื่อ</h2>
-                        <button className="btn-primary py-2 px-4 text-sm flex items-center gap-2">
-                            <Plus size={18} />
-                            เพิ่มรายชื่อใหม่
-                        </button>
+                        <div className="flex bg-white p-1 rounded-xl shadow-sm border border-gray-100">
+                            {['M4', 'M5', 'M6'].map(level => (
+                                <button 
+                                    key={level}
+                                    onClick={() => setSelectedLevel(level)}
+                                    className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${selectedLevel === level ? 'bg-spk-blue text-white shadow-md' : 'text-gray-400 hover:bg-gray-50'}`}
+                                >
+                                    ม.{level.replace('M', '')}
+                                </button>
+                            ))}
+                        </div>
                     </div>
 
                     <div className="card border-none shadow-xl bg-white overflow-hidden">
-                        <div className="p-6 border-b border-gray-50">
+                        <div className="p-6 border-b border-gray-50 flex flex-col sm:flex-row gap-4 justify-between items-center">
                             <div className="relative w-full sm:w-96">
                                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                                 <input 
@@ -1085,6 +1100,10 @@
                                     onChange={e => setSearchTerm(e.target.value)}
                                 />
                             </div>
+                            <button className="btn-primary py-2 px-4 text-sm flex items-center gap-2 whitespace-nowrap">
+                                <Plus size={18} />
+                                เพิ่มรายชื่อใหม่ (ม.{selectedLevel.replace('M', '')})
+                            </button>
                         </div>
                         <div className="overflow-x-auto">
                             <table className="w-full text-left">
@@ -1098,12 +1117,12 @@
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-50">
-                                    {students.filter(s => s.fullName.includes(searchTerm) || s.studentId.includes(searchTerm)).map(s => (
+                                    {filteredStudents.map(s => (
                                         <tr key={s.studentId} className="hover:bg-blue-50/30 transition-colors group">
                                             <td className="p-6 font-mono text-sm text-gray-600">{s.studentId}</td>
                                             <td className="p-6 font-bold text-gray-800">{s.fullName}</td>
-                                            <td className="p-6 text-sm text-gray-600">{s.grade}</td>
-                                            <td className="p-6 text-sm text-gray-600">{s.classroom}</td>
+                                            <td className="p-6 text-sm text-gray-600">ม.{s.grade}</td>
+                                            <td className="p-6 text-sm text-gray-600">ห้อง {s.classroom}</td>
                                             <td className="p-6 text-right">
                                                 <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                     <button className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"><Edit2 size={16} /></button>
@@ -1112,6 +1131,14 @@
                                             </td>
                                         </tr>
                                     ))}
+                                    {filteredStudents.length === 0 && (
+                                        <tr>
+                                            <td colSpan="5" className="p-12 text-center text-gray-400">
+                                                <Users size={48} className="mx-auto mb-4 opacity-10" />
+                                                <p>ไม่พบรายชื่อในระดับชั้น ม.{selectedLevel.replace('M', '')}</p>
+                                            </td>
+                                        </tr>
+                                    )}
                                 </tbody>
                             </table>
                         </div>
@@ -1375,10 +1402,12 @@
 
             const loadData = useCallback(async () => {
                 setIsLoading(true);
-                const [dRes, cRes, sRes, tRes] = await Promise.all([
+                const [dRes, cRes, s4Res, s5Res, s6Res, tRes] = await Promise.all([
                     gasHelper('read', 'Devices', null, currentUser), 
                     gasHelper('read', 'Categories', null, currentUser),
                     gasHelper('read', 'StudentsM4', null, currentUser),
+                    gasHelper('read', 'StudentsM5', null, currentUser),
+                    gasHelper('read', 'StudentsM6', null, currentUser),
                     gasHelper('read', 'Transactions', null, currentUser)
                 ]);
                 
@@ -1397,7 +1426,15 @@
                     });
                     setDevices(devs);
                     setCategories(cats);
-                    setStudents(sRes.success ? sRes.data : []);
+                    
+                    // Combine all student levels
+                    const allStudents = [
+                        ...(s4Res.success ? s4Res.data : []),
+                        ...(s5Res.success ? s5Res.data : []),
+                        ...(s6Res.success ? s6Res.data : [])
+                    ];
+                    setStudents(allStudents);
+                    
                     setTransactions(tRes.success ? tRes.data : []);
                     setStats({
                         total: devs.length,
