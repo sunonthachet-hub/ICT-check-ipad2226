@@ -112,7 +112,9 @@
         };
         
         // --- Environment Variables ---
-        const GAS_URL = process.env.GAS_URL || "https://script.google.com/macros/s/AKfycbyKbjmcTwQ7MT1PEvVc3y83Rqvo69TYkCDyD5a4MRXG0xcoGPiQe8Cb7oFyvRFiGDCOhA/exec";
+        // โปรดเปลี่ยน URL ด้านล่างนี้เป็น Web App URL ของคุณที่ได้จาก Google Apps Script
+        const DEFAULT_GAS_URL = "https://script.google.com/macros/s/AKfycbyKbjmcTwQ7MT1PEvVc3y83Rqvo69TYkCDyD5a4MRXG0xcoGPiQe8Cb7oFyvRFiGDCOhA/exec";
+        const GAS_URL = window.GAS_URL || DEFAULT_GAS_URL;
 
         // --- Lucide Icons Helper ---
         const Icon = ({ name, className, size = 24 }) => {
