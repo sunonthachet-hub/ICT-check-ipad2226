@@ -1,0 +1,5 @@
+{
+  "name": "SPK ICT Inventory System",
+  "description": "A comprehensive ICT equipment management system for schools, featuring inventory tracking, borrow/return workflows, and administrative controls.",
+  "requestFramePermissions": []
+}

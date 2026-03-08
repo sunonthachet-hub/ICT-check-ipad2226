@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SPK ICT Inventory System</title>
+    
+    <!-- CDNs -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/@tailwindcss/browser@4"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/framer-motion@10.16.4/dist/framer-motion.js"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <style type="text/tailwindcss">
+        @theme {
+            --font-sans: "Sarabun", sans-serif;
+            --color-spk-blue: #003366;
+            --color-spk-yellow: #FFCC00;
+            --color-spk-gray: #F5F5F5;
+        }
+
+        body {
+            font-family: "Sarabun", sans-serif;
+            background-color: #F5F5F5;
+            color: #1a202c;
+        }
+
+        @layer components {
+            .btn-primary {
+                background-color: #003366;
+                color: white;
+                padding: 0.75rem 1.5rem;
+                border-radius: 0.75rem;
+                font-weight: 700;
+                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+                transition: all 0.2s;
+            }
+            .btn-primary:hover {
+                background-color: #002244;
+            }
+            .card {
+                background-color: white;
+                padding: 1.5rem;
+                border-radius: 2rem;
+                border: 1px solid #edf2f7;
+            }
+            .input-field {
+                width: 100%;
+                padding: 1rem 1.25rem;
+                background-color: #F5F5F5;
+                border: none;
+                border-radius: 1rem;
+                outline: none;
+                transition: all 0.2s;
+            }
+            .input-field:focus {
+                background-color: white;
+                box-shadow: 0 0 0 2px #003366;
+            }
+        }
+
+        .loader {
+            width: 48px;
+            height: 48px;
+            border: 5px solid #003366;
+            border-bottom-color: transparent;
+            border-radius: 50%;
+            display: inline-block;
+            box-sizing: border-box;
+            animation: rotation 1s linear infinite;
+        }
+
+        @keyframes rotation {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .animate-gradient {
+            background-size: 200% auto;
+            animation: shine 3s linear infinite;
+        }
+
+        @keyframes shine {
+            to { background-position: 200% center; }
+        }
+
+        /* Lucide icon fix for standalone */
+        [data-lucide] {
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel" data-presets="react,typescript">
+        const { useState, useEffect, useCallback, useRef, useMemo } = React;
+        const { motion, AnimatePresence } = window.Motion || { 
+            motion: { 
+                div: (props) => <div {...props} />,
+                h1: (props) => <h1 {...props} />,
+                p: (props) => <p {...props} />,
+                button: (props) => <button {...props} />,
+            }, 
+            AnimatePresence: ({children}) => <>{children}</> 
+        };
+        
+        // --- Environment Variables ---
+        const GAS_URL = "https://script.google.com/macros/s/AKfycbyKbjmcTwQ7MT1PEvVc3y83Rqvo69TYkCDyD5a4MRXG0xcoGPiQe8Cb7oFyvRFiGDCOhA/exec"; // ตั้งค่า URL ของ Google Apps Script ที่นี่
+
+        // --- Lucide Icons Helper ---
+        const Icon = ({ name, className, size = 24 }) => {
+            useEffect(() => {
+                if (window.lucide) {
+                    window.lucide.createIcons();
+                }
+            });
+            return <i data-lucide={name} className={className} style={{ width: size, height: size }}></i>;
+        };
+
+        const RefreshCw = (props) => <Icon name="refresh-cw" {...props} />;
+        const Tablet = (props) => <Icon name="tablet" {...props} />;
+        const Smartphone = (props) => <Icon name="smartphone" {...props} />;
+        const LogIn = (props) => <Icon name="log-in" {...props} />;
+        const AlertTriangle = (props) => <Icon name="alert-triangle" {...props} />;
+        const Package = (props) => <Icon name="package" {...props} />;
+        const FileText = (props) => <Icon name="file-text" {...props} />;
+        const Phone = (props) => <Icon name="phone" {...props} />;
+        const Facebook = (props) => <Icon name="facebook" {...props} />;
+        const MapPin = (props) => <Icon name="map-pin" {...props} />;
+        const Send = (props) => <Icon name="send" {...props} />;
+        const Camera = (props) => <Icon name="camera" {...props} />;
+        const CheckCircle2 = (props) => <Icon name="check-circle-2" {...props} />;
+        const QrCode = (props) => <Icon name="qr-code" {...props} />;
+        const X = (props) => <Icon name="x" {...props} />;
+        const Mail = (props) => <Icon name="mail" {...props} />;
+        const Lock = (props) => <Icon name="lock" {...props} />;
+        const AlertCircle = (props) => <Icon name="alert-circle" {...props} />;
+        const ShieldCheck = (props) => <Icon name="shield-check" {...props} />;
+        const ArrowLeft = (props) => <Icon name="arrow-left" {...props} />;
+        const LayoutDashboard = (props) => <Icon name="layout-dashboard" {...props} />;
+        const Settings = (props) => <Icon name="settings" {...props} />;
+        const LogOut = (props) => <Icon name="log-out" {...props} />;
+        const CheckCircle = (props) => <Icon name="check-circle" {...props} />;
+        const BarChart3 = (props) => <Icon name="bar-chart-3" {...props} />;
+        const TrendingUp = (props) => <Icon name="trending-up" {...props} />;
+        const Clock = (props) => <Icon name="clock" {...props} />;
+        const Search = (props) => <Icon name="search" {...props} />;
+        const Filter = (props) => <Icon name="filter" {...props} />;
+        const Tag = (props) => <Icon name="tag" {...props} />;
+        const Info = (props) => <Icon name="info" {...props} />;
+        const UserIcon = (props) => <Icon name="user" {...props} />;
+        const Calendar = (props) => <Icon name="calendar" {...props} />;
+        const ArrowRightLeft = (props) => <Icon name="arrow-right-left" {...props} />;
+        const Plus = (props) => <Icon name="plus" {...props} />;
+        const Edit2 = (props) => <Icon name="edit-2" {...props} />;
+        const Trash2 = (props) => <Icon name="trash-2" {...props} />;
+        const Users = (props) => <Icon name="users" {...props} />;
+
+        // --- Types & Constants ---
+        const UserRole = { Admin: 'Admin', Staff: 'Staff', Student: 'Student', Teacher: 'Teacher' };
+        const DeviceStatus = { Available: 'Available', Borrowed: 'Borrowed', Maintenance: 'Maintenance', PendingApproval: 'PendingApproval', Lost: 'Lost' };
+
+        const translations = {
+            th: {
+                dashboard: 'แผงควบคุม',
+                inventory: 'คลังอุปกรณ์',
+                borrow: 'ยืม-คืน',
+                admin: 'ผู้ดูแลระบบ',
+                logout: 'ออกจากระบบ',
+                welcome: 'ยินดีต้อนรับ',
+                total_devices: 'อุปกรณ์ทั้งหมด',
+                available: 'ว่าง',
+                borrowed: 'ถูกยืม',
+                maintenance: 'ซ่อมบำรุง',
+                loading: 'กำลังโหลด...',
+                login: 'เข้าสู่ระบบ',
+                username: 'ชื่อผู้ใช้',
+                password: 'รหัสผ่าน',
+                back: 'กลับ',
+                start: 'เริ่มต้นใช้งาน',
+                admin_login: 'เข้าสู่ระบบผู้ดูแล',
+                db_connected: 'เชื่อมต่อฐานข้อมูลแล้ว',
+                db_disconnected: 'ไม่ได้เชื่อมต่อฐานข้อมูล',
+            }
+        };
+
+        // --- Service ---
+        const gasHelper = async (action, sheetName, data) => {
+            if (!GAS_URL || GAS_URL.includes('XXXXXXXXX')) {
+                if (action === 'login') return { success: true, user: { id: '1', users: 'admin', role: 'Admin', name: 'Admin User' } };
+                return { success: true, data: [] };
+            }
+            try {
+                const response = await fetch(GAS_URL, {
+                    method: 'POST',
+                    mode: 'cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action, sheetName, data }),
+                });
+                return await response.json();
+            } catch (error) {
+                if (action === 'login') return { success: true, user: { id: '1', users: 'admin', role: 'Admin', name: 'Admin User' } };
+                return { success: false, error: error.message };
+            }
+        };
+
+        // --- Components ---
+
+        const LandingPage = ({ onStart, onAdminLogin, dbConnected, categories, devices }) => {
+            const [activeSection, setActiveSection] = useState('home');
+            const [isSubmitting, setIsSubmitting] = useState(false);
+            const [submitSuccess, setSubmitSuccess] = useState(false);
+            const [isScannerOpen, setIsScannerOpen] = useState(false);
+            const [reportForm, setReportForm] = useState({ device_id: '', issue_type: '', details: '' });
+
+            const handleReportSubmit = async (e) => {
+                e.preventDefault();
+                setIsSubmitting(true);
+                const res = await gasHelper('append', 'Service', { ...reportForm, report_date: new Date().toLocaleString('th-TH'), status: 'Pending' });
+                if (res.success) {
+                    setSubmitSuccess(true);
+                    setReportForm({ device_id: '', issue_type: '', details: '' });
+                }
+                setIsSubmitting(false);
+            };
+
+            const renderSection = () => {
+                if (activeSection === 'home') return (
+                    <div className="pt-20">
+                        <div className="text-center mb-20">
+                            <h1 className="text-4xl md:text-7xl font-black text-white mb-8 leading-tight flex flex-col items-center gap-6">
+                                <div className="flex items-center gap-6 mb-2">
+                                    <img src="https://www.spk.ac.th/home/wp-content/uploads/2025/10/spk-logo-png-new-1.png" className="w-20 h-20 md:w-28 md:h-28" />
+                                    <span>ระบบยืมอุปกรณ์</span>
+                                </div>
+                                <span className="text-transparent bg-clip-text bg-gradient-to-r from-spk-yellow via-white to-spk-yellow bg-[length:200%_auto] animate-gradient">Apple iPad เพื่อการศึกษา</span>
+                            </h1>
+                            <button onClick={onStart} className="btn-primary bg-spk-yellow text-spk-blue px-12 py-6 rounded-2xl font-black text-xl shadow-xl">เริ่มต้นใช้งาน</button>
+                        </div>
+                    </div>
+                );
+                return <div className="text-white p-20 text-center">Section {activeSection} Content...</div>;
+            };
+
+            return (
+                <div className="min-h-screen bg-slate-950 text-white relative overflow-hidden">
+                    <header className="fixed top-0 left-0 right-0 z-50 bg-slate-950/50 backdrop-blur-xl border-b border-white/5 p-6 flex justify-between items-center">
+                        <div className="flex items-center gap-3">
+                            <Tablet className="text-white w-6 h-6" />
+                            <span className="font-bold text-xl">iPad Check</span>
+                        </div>
+                        <button onClick={onAdminLogin} className="btn-primary py-2 px-4 text-sm">แอดมิน</button>
+                    </header>
+                    <main className="pt-48 px-6 max-w-7xl mx-auto">{renderSection()}</main>
+                </div>
+            );
+        };
+
+        const Login = ({ onLogin, onBack, t }) => {
+            const [users, setUsers] = useState('');
+            const [password, setPassword] = useState('');
+            const [isLoading, setIsLoading] = useState(false);
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                setIsLoading(true);
+                const res = await gasHelper('login', null, { users, password });
+                if (res.success) onLogin(res.user);
+                setIsLoading(false);
+            };
+            return (
+                <div className="min-h-screen flex items-center justify-center bg-spk-blue p-4">
+                    <div className="bg-white p-8 rounded-3xl shadow-2xl w-full max-w-md">
+                        <h2 className="text-2xl font-bold mb-6 text-center">เข้าสู่ระบบ</h2>
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            <input type="text" value={users} onChange={e => setUsers(e.target.value)} className="input-field" placeholder="Username" required />
+                            <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="input-field" placeholder="Password" required />
+                            <button type="submit" disabled={isLoading} className="btn-primary w-full">เข้าสู่ระบบ</button>
+                        </form>
+                    </div>
+                </div>
+            );
+        };
+
+        const Layout = ({ children, currentUser, activeTab, setActiveTab, onLogout, t }) => (
+            <div className="min-h-screen bg-spk-gray">
+                <nav className="bg-spk-blue text-white p-4 shadow-lg">
+                    <div className="max-w-7xl mx-auto flex justify-between items-center">
+                        <h1 className="text-xl font-bold">iPad Check</h1>
+                        <div className="flex gap-4">
+                            <button onClick={() => setActiveTab('dashboard')} className={`px-4 py-2 rounded-lg ${activeTab === 'dashboard' ? 'bg-spk-yellow text-spk-blue' : ''}`}>แผงควบคุม</button>
+                            <button onClick={() => setActiveTab('inventory')} className={`px-4 py-2 rounded-lg ${activeTab === 'inventory' ? 'bg-spk-yellow text-spk-blue' : ''}`}>คลังอุปกรณ์</button>
+                            <button onClick={() => setActiveTab('borrow')} className={`px-4 py-2 rounded-lg ${activeTab === 'borrow' ? 'bg-spk-yellow text-spk-blue' : ''}`}>ยืม-คืน</button>
+                            {currentUser.role === 'Admin' && <button onClick={() => setActiveTab('admin')} className={`px-4 py-2 rounded-lg ${activeTab === 'admin' ? 'bg-spk-yellow text-spk-blue' : ''}`}>แอดมิน</button>}
+                            <button onClick={onLogout} className="px-4 py-2 text-red-300">ออกจากระบบ</button>
+                        </div>
+                    </div>
+                </nav>
+                <main className="p-8 max-w-7xl mx-auto">{children}</main>
+            </div>
+        );
+
+        const AdminPanel = ({ devices, categories, onUpdate, t }) => (
+            <div className="space-y-6">
+                <h2 className="text-3xl font-bold text-spk-blue">แผงควบคุมผู้ดูแลระบบ</h2>
+                <div className="card">
+                    <table className="w-full text-left">
+                        <thead>
+                            <tr className="border-b text-gray-500">
+                                <th className="p-4">ชื่ออุปกรณ์</th>
+                                <th className="p-4">หมายเลขเครื่อง</th>
+                                <th className="p-4">สถานะ</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {devices.map(d => (
+                                <tr key={d.id} className="border-b hover:bg-gray-50">
+                                    <td className="p-4 font-medium">{d.name}</td>
+                                    <td className="p-4 font-mono text-sm">{d.serial_number}</td>
+                                    <td className="p-4">
+                                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${d.status === 'Available' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+                                            {d.status === 'Available' ? 'ว่าง' : d.status === 'Borrowed' ? 'ถูกยืม' : d.status}
+                                        </span>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        );
+
+        const App = () => {
+            const [isLoading, setIsLoading] = useState(true);
+            const [currentUser, setCurrentUser] = useState(null);
+            const [showLogin, setShowLogin] = useState(false);
+            const [activeTab, setActiveTab] = useState('dashboard');
+            const [devices, setDevices] = useState([]);
+            const [categories, setCategories] = useState([]);
+            const [stats, setStats] = useState({ total: 0, available: 0, borrowed: 0, maintenance: 0 });
+
+            const loadData = useCallback(async () => {
+                setIsLoading(true);
+                const [dRes, cRes] = await Promise.all([gasHelper('read', 'Devices'), gasHelper('read', 'Categories')]);
+                if (dRes.success && cRes.success) {
+                    const cats = cRes.data;
+                    const devs = dRes.data.map(d => ({ ...d, name: cats.find(c => c.id === d.category_id)?.name || 'Device' }));
+                    setDevices(devs);
+                    setCategories(cats);
+                    setStats({
+                        total: devs.length,
+                        available: devs.filter(d => d.status === 'Available').length,
+                        borrowed: devs.filter(d => d.status === 'Borrowed').length,
+                        maintenance: devs.filter(d => d.status === 'Maintenance').length
+                    });
+                }
+                setIsLoading(false);
+            }, []);
+
+            useEffect(() => { loadData(); }, [loadData]);
+
+            const t = (key) => translations.th[key] || key;
+
+            if (isLoading) return <div className="fixed inset-0 flex items-center justify-center bg-white"><div className="loader"></div></div>;
+
+            if (!currentUser) {
+                if (showLogin) return <Login onLogin={user => setCurrentUser(user)} onBack={() => setShowLogin(false)} t={t} />;
+                return <LandingPage onStart={() => setShowLogin(true)} onAdminLogin={() => setShowLogin(true)} categories={categories} devices={devices} />;
+            }
+
+            const renderContent = () => {
+                switch (activeTab) {
+                    case 'dashboard': return <Dashboard stats={stats} t={t} />;
+                    case 'inventory': return <Inventory devices={devices} t={t} />;
+                    case 'borrow': return <BorrowReturn devices={devices} currentUser={currentUser} onUpdate={loadData} t={t} />;
+                    case 'admin': return <AdminPanel devices={devices} categories={categories} onUpdate={loadData} t={t} />;
+                    default: return <Dashboard stats={stats} t={t} />;
+                }
+            };
+
+            return (
+                <Layout currentUser={currentUser} activeTab={activeTab} setActiveTab={setActiveTab} onLogout={() => setCurrentUser(null)} t={t}>
+                    {renderContent()}
+                </Layout>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
