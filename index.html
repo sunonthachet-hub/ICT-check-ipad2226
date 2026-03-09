@@ -570,9 +570,9 @@
                                                 {t.status === 'Borrowed' ? <LogIn size={14} /> : <CheckCircle size={14} />}
                                             </div>
                                             <div>
-                                                <p className="text-sm font-bold text-gray-800">{t.fname}</p>
+                                                <p className="text-sm font-bold text-gray-800">{t.fname || 'ไม่ระบุชื่อ'}</p>
                                                 <p className="text-xs text-gray-500 mb-1">{t.status === 'Borrowed' ? 'ยืม' : 'คืน'}เครื่อง {t.serial_number}</p>
-                                                <p className="text-[10px] text-gray-400">{t.borrow_date} {t.borrowTime}</p>
+                                                <p className="text-[10px] text-gray-400">{t.borrowDate || t.borrow_date} {t.borrowTime}</p>
                                             </div>
                                         </div>
                                     ))}
@@ -595,22 +595,39 @@
             </div>
         );
 
-        const Inventory = ({ devices, categories, currentUser, onUpdate, t }) => {
+        const Inventory = ({ devices, categories, transactions, currentUser, onUpdate, t }) => {
             const [currentPage, setCurrentPage] = useState(1);
             const [searchTerm, setSearchTerm] = useState('');
             const [filterStatus, setFilterStatus] = useState('all');
             const [showAdminMenu, setShowAdminMenu] = useState(false);
             const [showImportModal, setShowImportModal] = useState(false);
+            const [showManageModal, setShowManageModal] = useState(false);
+            const [importTab, setImportTab] = useState('json');
             const [importJson, setImportJson] = useState('');
+            const [importSheetId, setImportSheetId] = useState('');
             const [isImporting, setIsImporting] = useState(false);
             const [importResult, setImportResult] = useState(null);
+            const [editingCategory, setEditingCategory] = useState(null);
+            const [categoryForm, setCategoryForm] = useState({ name: '', description: '', designatedFor: 'Student', imageUrl: '' });
             const itemsPerPage = 31;
 
             const handleImport = async () => {
-                if (!importJson.trim()) return;
                 setIsImporting(true);
                 try {
-                    const data = JSON.parse(importJson);
+                    let data = [];
+                    if (importTab === 'json') {
+                        data = JSON.parse(importJson);
+                    } else {
+                        // For Sheet ID, we'll call a special GAS action
+                        const res = await gasHelper('importFromSheet', 'Transactions', { sheetId: importSheetId }, currentUser);
+                        if (res.success) {
+                            setImportResult(res);
+                            onUpdate();
+                            return;
+                        } else {
+                            throw new Error(res.message);
+                        }
+                    }
                     const res = await gasHelper('importTransactions', 'Transactions', data, currentUser);
                     if (res.success) {
                         setImportResult(res);
@@ -619,10 +636,78 @@
                         alert('นำเข้าข้อมูลไม่สำเร็จ: ' + res.message);
                     }
                 } catch (e) {
-                    alert('รูปแบบ JSON ไม่ถูกต้อง: ' + e.message);
+                    alert('เกิดข้อผิดพลาด: ' + e.message);
                 } finally {
                     setIsImporting(false);
                 }
+            };
+
+            const handleSaveCategory = async (e) => {
+                e.preventDefault();
+                setIsImporting(true);
+                try {
+                    const action = editingCategory ? 'update' : 'append';
+                    const data = editingCategory ? { ...categoryForm, id: editingCategory.id } : categoryForm;
+                    const res = await gasHelper(action, 'Categories', data, currentUser);
+                    if (res.success) {
+                        setCategoryForm({ name: '', description: '', designatedFor: 'Student', imageUrl: '' });
+                        setEditingCategory(null);
+                        onUpdate();
+                    }
+                } catch (e) {
+                    alert('Error: ' + e.message);
+                }
+                setIsImporting(false);
+            };
+
+            const handlePrint = () => {
+                const printWindow = window.open('', '_blank');
+                const html = `
+                    <html>
+                        <head>
+                            <title>Inventory Report</title>
+                            <style>
+                                body { font-family: 'Sarabun', sans-serif; padding: 20px; }
+                                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                                th, td { border: 1px solid #ddd; padding: 12px; text-align: left; font-size: 12px; }
+                                th { background-color: #f8f9fa; font-weight: bold; }
+                                h1 { text-align: center; color: #003366; }
+                                .status { font-weight: bold; text-transform: uppercase; }
+                            </style>
+                        </head>
+                        <body>
+                            <h1>รายงานคลังอุปกรณ์ ICT</h1>
+                            <p>วันที่พิมพ์: ${new Date().toLocaleString('th-TH')}</p>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>ลำดับ</th>
+                                        <th>ชื่ออุปกรณ์</th>
+                                        <th>Serial Number</th>
+                                        <th>หมวดหมู่</th>
+                                        <th>สำหรับ</th>
+                                        <th>สถานะ</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${filteredDevices.map((d, i) => `
+                                        <tr>
+                                            <td>${i + 1}</td>
+                                            <td>${d.name}</td>
+                                            <td>${d.serial_number}</td>
+                                            <td>${categories.find(c => c.id === d.category_id)?.name || '-'}</td>
+                                            <td>${d.designatedFor === 'Teacher' ? 'ครู' : 'นักเรียน'}</td>
+                                            <td class="status">${d.status === 'Available' ? 'ว่าง' : 'ถูกยืม'}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                            <script>window.print();<\/script>
+                        </body>
+                    </html>
+                `;
+                printWindow.document.write(html);
+                printWindow.document.close();
             };
 
             const filteredDevices = devices.filter(d => {
@@ -639,20 +724,100 @@
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                         <h2 className="text-3xl font-bold text-spk-blue">คลังอุปกรณ์</h2>
                         <div className="flex gap-2">
-                            <button onClick={() => setShowAdminMenu(!showAdminMenu)} className="btn-primary py-2 px-4 text-sm flex items-center gap-2 bg-spk-yellow text-spk-blue">
+                            <button onClick={() => setShowManageModal(true)} className="btn-primary py-2 px-4 text-sm flex items-center gap-2 bg-spk-yellow text-spk-blue">
                                 <Settings size={18} />
-                                จัดการข้อมูล
+                                จัดการอุปกรณ์
                             </button>
                             <button onClick={() => setShowImportModal(true)} className="btn-primary py-2 px-4 text-sm flex items-center gap-2 bg-blue-500 text-white">
                                 <Send size={18} />
                                 นำเข้าข้อมูล
                             </button>
-                            <button className="btn-primary py-2 px-4 text-sm flex items-center gap-2">
+                            <button onClick={handlePrint} className="btn-primary py-2 px-4 text-sm flex items-center gap-2">
                                 <FileText size={18} />
                                 ปรินท์เอกสาร
                             </button>
                         </div>
                     </div>
+
+                    {showManageModal && (
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden max-h-[90vh] flex flex-col">
+                                <div className="p-6 bg-spk-blue text-white flex justify-between items-center">
+                                    <h3 className="text-xl font-bold flex items-center gap-2">
+                                        <Settings size={24} />
+                                        จัดการหมวดหมู่และอุปกรณ์
+                                    </h3>
+                                    <button onClick={() => setShowManageModal(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                                        <X size={24} />
+                                    </button>
+                                </div>
+                                <div className="p-6 overflow-y-auto flex-grow grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    <div className="space-y-4">
+                                        <h4 className="font-bold text-spk-blue border-b pb-2">{editingCategory ? 'แก้ไขหมวดหมู่' : 'เพิ่มหมวดหมู่ใหม่'}</h4>
+                                        <form onSubmit={handleSaveCategory} className="space-y-4">
+                                            <input 
+                                                className="input-field" 
+                                                placeholder="ชื่อหมวดหมู่ (เช่น iPad Gen 9)" 
+                                                value={categoryForm.name}
+                                                onChange={e => setCategoryForm({...categoryForm, name: e.target.value})}
+                                                required
+                                            />
+                                            <textarea 
+                                                className="input-field min-h-[80px]" 
+                                                placeholder="รายละเอียด"
+                                                value={categoryForm.description}
+                                                onChange={e => setCategoryForm({...categoryForm, description: e.target.value})}
+                                            />
+                                            <select 
+                                                className="input-field"
+                                                value={categoryForm.designatedFor}
+                                                onChange={e => setCategoryForm({...categoryForm, designatedFor: e.target.value})}
+                                            >
+                                                <option value="Student">สำหรับนักเรียน</option>
+                                                <option value="Teacher">สำหรับครู</option>
+                                            </select>
+                                            <input 
+                                                className="input-field" 
+                                                placeholder="URL รูปภาพ"
+                                                value={categoryForm.imageUrl}
+                                                onChange={e => setCategoryForm({...categoryForm, imageUrl: e.target.value})}
+                                            />
+                                            <div className="flex gap-2">
+                                                <button type="submit" disabled={isImporting} className="btn-primary flex-1">
+                                                    {isImporting ? <RefreshCw className="animate-spin mx-auto" size={18} /> : (editingCategory ? 'บันทึกการแก้ไข' : 'เพิ่มหมวดหมู่')}
+                                                </button>
+                                                {editingCategory && (
+                                                    <button type="button" onClick={() => { setEditingCategory(null); setCategoryForm({ name: '', description: '', designatedFor: 'Student', imageUrl: '' }); }} className="px-4 py-2 bg-gray-100 rounded-xl">ยกเลิก</button>
+                                                )}
+                                            </div>
+                                        </form>
+                                    </div>
+                                    <div className="space-y-4">
+                                        <h4 className="font-bold text-spk-blue border-b pb-2">รายการหมวดหมู่ทั้งหมด</h4>
+                                        <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
+                                            {categories.map(cat => (
+                                                <div key={cat.id} className="p-3 bg-gray-50 rounded-xl flex justify-between items-center group">
+                                                    <div>
+                                                        <p className="font-bold text-sm">{cat.name}</p>
+                                                        <p className="text-[10px] text-gray-400">{cat.designatedFor === 'Student' ? 'นักเรียน' : 'ครู'}</p>
+                                                    </div>
+                                                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <button onClick={() => { setEditingCategory(cat); setCategoryForm(cat); }} className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg"><Edit2 size={14} /></button>
+                                                        <button onClick={async () => {
+                                                            if (confirm('ยืนยันการลบหมวดหมู่?')) {
+                                                                const res = await gasHelper('delete', 'Categories', { id: cat.id }, currentUser);
+                                                                if (res.success) onUpdate();
+                                                            }
+                                                        }} className="p-2 text-red-600 hover:bg-red-100 rounded-lg"><Trash2 size={14} /></button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        </div>
+                    )}
 
                     {showImportModal && (
                         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -660,7 +825,7 @@
                                 <div className="p-6 bg-spk-blue text-white flex justify-between items-center">
                                     <h3 className="text-xl font-bold flex items-center gap-2">
                                         <Send size={24} />
-                                        นำเข้าข้อมูล (JSON / Google Sheet)
+                                        นำเข้าข้อมูล
                                     </h3>
                                     <button onClick={() => { setShowImportModal(false); setImportResult(null); }} className="p-2 hover:bg-white/10 rounded-full transition-colors">
                                         <X size={24} />
@@ -669,18 +834,46 @@
                                 <div className="p-6 space-y-4">
                                     {!importResult ? (
                                         <>
-                                            <p className="text-sm text-gray-600">วางข้อมูล JSON ของรายการยืม-คืน (Transactions) ในช่องด้านล่าง:</p>
-                                            <textarea 
-                                                className="input-field min-h-[200px] font-mono text-xs"
-                                                placeholder='[{"fid": "12345", "fname": "ชื่อ-นามสกุล", "serial_number": "SN001", ...}]'
-                                                value={importJson}
-                                                onChange={e => setImportJson(e.target.value)}
-                                            ></textarea>
+                                            <div className="flex bg-gray-100 p-1 rounded-xl mb-4">
+                                                <button onClick={() => setImportTab('json')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${importTab === 'json' ? 'bg-white shadow-sm text-spk-blue' : 'text-gray-400'}`}>JSON Data</button>
+                                                <button onClick={() => setImportTab('sheet')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${importTab === 'sheet' ? 'bg-white shadow-sm text-spk-blue' : 'text-gray-400'}`}>Google Sheet ID</button>
+                                            </div>
+
+                                            {importTab === 'json' ? (
+                                                <>
+                                                    <p className="text-sm text-gray-600">วางข้อมูล JSON ของรายการยืม-คืน (Transactions) ในช่องด้านล่าง:</p>
+                                                    <textarea 
+                                                        className="input-field min-h-[200px] font-mono text-xs"
+                                                        placeholder='[{"fid": "12345", "fname": "ชื่อ-นามสกุล", "serial_number": "SN001", ...}]'
+                                                        value={importJson}
+                                                        onChange={e => setImportJson(e.target.value)}
+                                                    ></textarea>
+                                                </>
+                                            ) : (
+                                                <div className="space-y-4 py-4">
+                                                    <p className="text-sm text-gray-600">ระบุ Spreadsheet ID ของ Google Sheet ที่ต้องการนำเข้าข้อมูล:</p>
+                                                    <input 
+                                                        className="input-field" 
+                                                        placeholder="1abc123... (Spreadsheet ID)"
+                                                        value={importSheetId}
+                                                        onChange={e => setImportSheetId(e.target.value)}
+                                                    />
+                                                    <div className="p-4 bg-blue-50 rounded-xl border border-blue-100 text-[10px] text-blue-700">
+                                                        <p className="font-bold mb-1">คำแนะนำ:</p>
+                                                        <ul className="list-disc pl-4 space-y-1">
+                                                            <li>Spreadsheet ID คือข้อความใน URL ระหว่าง /d/ และ /edit</li>
+                                                            <li>ชีทเป้าหมายต้องมีชื่อว่า "Transactions"</li>
+                                                            <li>ต้องแชร์สิทธิ์ให้ Anyone with link can view หรือแชร์ให้ Email ของ Service Account</li>
+                                                        </ul>
+                                                    </div>
+                                                </div>
+                                            )}
+
                                             <div className="flex justify-end gap-3">
                                                 <button onClick={() => setShowImportModal(false)} className="px-6 py-2 rounded-xl border border-gray-200 font-bold text-gray-600 hover:bg-gray-50">ยกเลิก</button>
                                                 <button 
                                                     onClick={handleImport}
-                                                    disabled={isImporting || !importJson.trim()}
+                                                    disabled={isImporting || (importTab === 'json' ? !importJson.trim() : !importSheetId.trim())}
                                                     className="px-6 py-2 rounded-xl bg-spk-blue text-white font-bold hover:bg-blue-900 disabled:opacity-50 flex items-center gap-2"
                                                 >
                                                     {isImporting ? <RefreshCw size={18} className="animate-spin" /> : <Plus size={18} />}
@@ -709,7 +902,7 @@
                                                     {importResult.errors.map((err, i) => <p key={i}>{err}</p>)}
                                                 </div>
                                             )}
-                                            <button onClick={() => { setShowImportModal(false); setImportResult(null); setImportJson(''); }} className="btn-primary w-full max-w-xs mx-auto">ปิดหน้าต่าง</button>
+                                            <button onClick={() => { setShowImportModal(false); setImportResult(null); setImportJson(''); setImportSheetId(''); }} className="btn-primary w-full max-w-xs mx-auto">ปิดหน้าต่าง</button>
                                         </div>
                                     )}
                                 </div>
@@ -798,7 +991,11 @@
                                                 </div>
                                             </td>
                                             <td className="p-6">
-                                                <p className="text-sm text-gray-600">{d.status === 'Borrowed' ? 'นักเรียน ม.4/1' : '-'}</p>
+                                                <p className="text-sm text-gray-600">
+                                                    {d.status === 'Borrowed' ? (
+                                                        transactions.find(t => t.serial_number === d.serial_number && t.status === 'Borrowed')?.fname || 'ไม่ระบุชื่อ'
+                                                    ) : '-'}
+                                                </p>
                                             </td>
                                             <td className="p-6">
                                                 <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${d.status === 'Available' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
@@ -845,7 +1042,7 @@
             );
         };
 
-        const BorrowReturn = ({ devices, students, currentUser, onUpdate, t }) => {
+        const BorrowReturn = ({ devices, students, transactions, currentUser, onUpdate, t }) => {
             const [mode, setMode] = useState('borrow');
             const [selectedStudent, setSelectedStudent] = useState('');
             const [searchTerm, setSearchTerm] = useState('');
@@ -854,14 +1051,14 @@
             const [isScannerOpen, setIsScannerOpen] = useState(false);
             const [borrowForm, setBorrowForm] = useState({ email: '', notes: '' });
 
-            const filteredStudents = students.filter(s => 
-                s.fullName.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                s.studentId.includes(searchTerm)
+            const filteredStudents = (students || []).filter(s => 
+                (s.fullName || s.fname || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+                (s.studentId || s.fid || '').includes(searchTerm)
             );
 
-            const filteredDevices = devices.filter(d => {
+            const filteredDevices = (devices || []).filter(d => {
                 const matchesMode = mode === 'borrow' ? d.status === 'Available' : d.status === 'Borrowed';
-                const matchesSerial = d.serial_number.toLowerCase().includes(serialSearch.toLowerCase());
+                const matchesSerial = (d.serial_number || '').toLowerCase().includes(serialSearch.toLowerCase());
                 return matchesMode && matchesSerial;
             });
 
@@ -939,8 +1136,8 @@
                                                 onClick={() => setSelectedStudent(s.studentId)}
                                                 className={`w-full p-4 rounded-2xl text-left border-2 transition-all ${selectedStudent === s.studentId ? 'border-spk-blue bg-blue-50 shadow-md' : 'border-transparent bg-gray-50 hover:bg-gray-100'}`}
                                             >
-                                                <p className="font-bold text-sm text-gray-800">{s.fullName}</p>
-                                                <p className="text-[10px] text-gray-500 uppercase tracking-wider">{s.studentId} • ม.{s.grade}/{s.classroom}</p>
+                                                <p className="font-bold text-sm text-gray-800">{s.fullName || s.fname}</p>
+                                                <p className="text-[10px] text-gray-500 uppercase tracking-wider">{s.studentId || s.fid} • ม.{s.grade}/{s.classroom || s.room || '-'}</p>
                                             </button>
                                         ))}
                                     </div>
@@ -1065,9 +1262,9 @@
             const [searchTerm, setSearchTerm] = useState('');
             const [selectedLevel, setSelectedLevel] = useState('M4');
             
-            const filteredStudents = students.filter(s => {
-                const matchesSearch = s.fullName.includes(searchTerm) || s.studentId.includes(searchTerm);
-                const matchesLevel = s.grade == selectedLevel.replace('M', '');
+            const filteredStudents = (students || []).filter(s => {
+                const matchesSearch = (s.fullName || s.fname || '').includes(searchTerm) || (s.studentId || s.fid || '').includes(searchTerm);
+                const matchesLevel = (s.grade || '').toString() == selectedLevel.replace('M', '');
                 return matchesSearch && matchesLevel;
             });
 
@@ -1122,7 +1319,7 @@
                                             <td className="p-6 font-mono text-sm text-gray-600">{s.studentId}</td>
                                             <td className="p-6 font-bold text-gray-800">{s.fullName}</td>
                                             <td className="p-6 text-sm text-gray-600">ม.{s.grade}</td>
-                                            <td className="p-6 text-sm text-gray-600">ห้อง {s.classroom}</td>
+                                            <td className="p-6 text-sm text-gray-600">ห้อง {s.classroom || s.room || '-'}</td>
                                             <td className="p-6 text-right">
                                                 <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                     <button className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"><Edit2 size={16} /></button>
@@ -1252,18 +1449,27 @@
                             </h3>
                             <form onSubmit={handleRepairSubmit} className="space-y-6">
                                 <div>
-                                    <label className="block text-sm font-bold text-gray-700 mb-2">เลือกอุปกรณ์</label>
-                                    <select 
-                                        className="input-field"
-                                        value={repairForm.device_id}
-                                        onChange={e => setRepairForm({...repairForm, device_id: e.target.value})}
-                                        required
-                                    >
-                                        <option value="">-- เลือกอุปกรณ์ --</option>
-                                        {devices.map(d => (
-                                            <option key={d.serial_number} value={d.serial_number}>{d.name} ({d.serial_number})</option>
-                                        ))}
-                                    </select>
+                                    <label className="block text-sm font-bold text-gray-700 mb-2">ระบุ Serial Number อุปกรณ์</label>
+                                    <div className="relative">
+                                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                                        <input 
+                                            type="text" 
+                                            placeholder="พิมพ์ Serial Number..." 
+                                            className="input-field pl-12"
+                                            value={repairForm.device_id}
+                                            onChange={e => setRepairForm({...repairForm, device_id: e.target.value})}
+                                            required
+                                        />
+                                    </div>
+                                    {repairForm.device_id && (
+                                        <div className="mt-2 p-3 bg-blue-50 rounded-xl border border-blue-100">
+                                            {devices.find(d => d.serial_number === repairForm.device_id) ? (
+                                                <p className="text-xs text-blue-700 font-bold">✓ พบอุปกรณ์: {devices.find(d => d.serial_number === repairForm.device_id).name}</p>
+                                            ) : (
+                                                <p className="text-xs text-red-500 font-bold">✗ ไม่พบอุปกรณ์ในระบบ</p>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                                 <div>
                                     <label className="block text-sm font-bold text-gray-700 mb-2">ประเภทปัญหา</label>
@@ -1427,11 +1633,11 @@
                     setDevices(devs);
                     setCategories(cats);
                     
-                    // Combine all student levels
+                    // Combine all student levels and add grade property
                     const allStudents = [
-                        ...(s4Res.success ? s4Res.data : []),
-                        ...(s5Res.success ? s5Res.data : []),
-                        ...(s6Res.success ? s6Res.data : [])
+                        ...(s4Res.success ? s4Res.data.map(s => ({ ...s, grade: '4', fullName: s.fullName || s.fname, studentId: s.studentId || s.fid })) : []),
+                        ...(s5Res.success ? s5Res.data.map(s => ({ ...s, grade: '5', fullName: s.fullName || s.fname, studentId: s.studentId || s.fid })) : []),
+                        ...(s6Res.success ? s6Res.data.map(s => ({ ...s, grade: '6', fullName: s.fullName || s.fname, studentId: s.studentId || s.fid })) : [])
                     ];
                     setStudents(allStudents);
                     
@@ -1462,8 +1668,8 @@
             const renderContent = () => {
                 switch (activeTab) {
                     case 'dashboard': return <Dashboard stats={stats} transactions={transactions} t={t} />;
-                    case 'inventory': return <Inventory devices={devices} categories={categories} currentUser={currentUser} onUpdate={loadData} t={t} />;
-                    case 'borrow': return <BorrowReturn devices={devices} students={students} currentUser={currentUser} onUpdate={loadData} t={t} />;
+                    case 'inventory': return <Inventory devices={devices} categories={categories} transactions={transactions} currentUser={currentUser} onUpdate={loadData} t={t} />;
+                    case 'borrow': return <BorrowReturn devices={devices} students={students} transactions={transactions} currentUser={currentUser} onUpdate={loadData} t={t} />;
                     case 'registry': return <Registry students={students} onUpdate={loadData} t={t} />;
                     case 'repair': return <RepairService devices={devices} currentUser={currentUser} onUpdate={loadData} t={t} />;
                     default: return <Dashboard stats={stats} transactions={transactions} t={t} />;

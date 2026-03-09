@@ -43,6 +43,8 @@ function doPost(e) {
         return handleDelete(ss, sheet, sheetName, data, user);
       case 'importTransactions':
         return handleImportTransactions(ss, sheet, data, user);
+      case 'importFromSheet':
+        return handleImportFromSheet(ss, sheet, data, user);
       default:
         return shadowResponse({ success: false, message: 'Unknown action' });
     }
@@ -141,21 +143,55 @@ function handleImportTransactions(ss, sheet, data, user) {
   }
 }
 
+function handleImportFromSheet(ss, targetSheet, data, user) {
+  try {
+    const sourceSs = SpreadsheetApp.openById(data.sheetId);
+    const sourceSheet = sourceSs.getSheetByName('Transactions');
+    if (!sourceSheet) throw new Error('Source sheet "Transactions" not found');
+    
+    const sourceValues = sourceSheet.getDataRange().getValues();
+    const sourceHeaders = sourceValues[0];
+    const sourceData = sourceValues.slice(1).map(row => {
+      const obj = {};
+      sourceHeaders.forEach((h, i) => obj[h] = row[i]);
+      return obj;
+    });
+    
+    return handleImportTransactions(ss, targetSheet, sourceData, user);
+  } catch (e) {
+    return shadowResponse({ success: false, message: e.toString() });
+  }
+}
+
 function handleUpdate(ss, sheet, sheetName, data, user) {
   const values = sheet.getDataRange().getValues();
   const headers = values[0];
   const idIndex = headers.indexOf('id');
   const serialIndex = headers.indexOf('serial_number');
+  const statusIndex = headers.indexOf('status');
+  const borrowerIdIndex = headers.indexOf('borrowerId');
   
   // Find row by ID or Serial Number
   let rowIndex = -1;
   for (let i = 1; i < values.length; i++) {
-    // Priority 1: Match by ID
+    // Special logic for Transactions: Find the ACTIVE (Borrowed) record for this device
+    if (sheetName === 'Transactions' && data.status === 'Returned') {
+      if (serialIndex !== -1 && values[i][serialIndex] == data.serial_number && values[i][statusIndex] == 'Borrowed') {
+        rowIndex = i + 1;
+        break;
+      }
+    }
+
+    // Priority 1: Match by borrowerId (for Transactions) or id
+    if (borrowerIdIndex !== -1 && data.borrowerId && values[i][borrowerIdIndex] == data.borrowerId) {
+      rowIndex = i + 1;
+      break;
+    }
     if (idIndex !== -1 && data.id && values[i][idIndex] == data.id) {
       rowIndex = i + 1;
       break;
     }
-    // Priority 2: Match by Serial Number (especially for Devices sheet without ID)
+    // Priority 2: Match by Serial Number (especially for Devices sheet)
     if (serialIndex !== -1 && data.serial_number && values[i][serialIndex] == data.serial_number) {
       rowIndex = i + 1;
       break;
