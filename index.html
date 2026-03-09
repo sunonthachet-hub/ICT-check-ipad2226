@@ -1620,10 +1620,35 @@
                 if (dRes.success && cRes.success) {
                     setDbStatus('connected');
                     const cats = cRes.data;
+                    const trans = tRes.success ? tRes.data : [];
+                    
                     const devs = dRes.data.map(d => {
                         const cat = cats.find(c => c.id === d.category_id) || {};
+                        
+                        // Find the latest transaction for this device to determine its true status
+                        // Sort transactions by date and time descending to find the most recent one
+                        const deviceTransactions = trans
+                            .filter(t => t.serial_number === d.serial_number)
+                            .sort((a, b) => {
+                                const dateA = new Date(`${a.borrowDate || a.borrow_date} ${a.borrowTime || '00:00'}`);
+                                const dateB = new Date(`${b.borrowDate || b.borrow_date} ${b.borrowTime || '00:00'}`);
+                                return dateB - dateA;
+                            });
+                        
+                        const latestTrans = deviceTransactions[0];
+                        let currentStatus = d.status;
+                        
+                        if (latestTrans) {
+                            if (latestTrans.status === 'Borrowed') {
+                                currentStatus = 'Borrowed';
+                            } else if (latestTrans.status === 'Returned' || latestTrans.status === 'Available') {
+                                currentStatus = 'Available';
+                            }
+                        }
+
                         return { 
                             ...d, 
+                            status: currentStatus,
                             name: cat.name || 'Device',
                             description: cat.description || '',
                             designatedFor: cat.designatedFor || 'All',
@@ -1632,6 +1657,7 @@
                     });
                     setDevices(devs);
                     setCategories(cats);
+                    setTransactions(trans);
                     
                     // Combine all student levels and add grade property
                     const allStudents = [
@@ -1640,8 +1666,6 @@
                         ...(s6Res.success ? s6Res.data.map(s => ({ ...s, grade: '6', fullName: s.fullName || s.fname, studentId: s.studentId || s.fid })) : [])
                     ];
                     setStudents(allStudents);
-                    
-                    setTransactions(tRes.success ? tRes.data : []);
                     setStats({
                         total: devs.length,
                         available: devs.filter(d => d.status === 'Available').length,
