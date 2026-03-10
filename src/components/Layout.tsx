@@ -1,6 +1,6 @@
 import React from 'react';
 import { User, UserRole, TranslationKey } from '../types';
-import { LayoutDashboard, Package, RefreshCw, Settings, LogOut, Wrench, History } from 'lucide-react';
+import { LayoutDashboard, Package, RefreshCw, Settings, LogOut, Wrench, History, Users } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -26,6 +26,7 @@ const Layout: React.FC<LayoutProps> = ({ children, currentUser, activeTab, setAc
   ];
 
   if (currentUser.role === UserRole.Admin || currentUser.role === UserRole.Staff) {
+    menuItems.push({ id: 'students', label: t('studentsRegistry'), icon: Users });
     menuItems.push({ id: 'logs', label: t('logs'), icon: History });
     menuItems.push({ id: 'admin', label: t('admin'), icon: Settings });
   }

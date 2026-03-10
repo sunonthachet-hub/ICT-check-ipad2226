@@ -20,6 +20,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ devices, categories, onUpdate, 
   const [activeSubTab, setActiveSubTab] = useState<'inventory' | 'categories' | 'maintenance' | 'users' | 'students' | 'service'>('inventory');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Device | Category | MaintenanceRecord | User | null>(null);
+  const [studentGradeFilter, setStudentGradeFilter] = useState<string>('all');
+  const [studentSearchTerm, setStudentSearchTerm] = useState<string>('');
 
   const handleDelete = async (type: 'Devices' | 'Categories' | 'Users' | 'Students' | 'Service', id: string) => {
     if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการลบรายการนี้?')) return;
@@ -90,14 +92,37 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ devices, categories, onUpdate, 
       {/* Content Area */}
       <div className="card overflow-hidden">
         <div className="flex justify-between items-center mb-6">
-          <h3 className="text-lg font-bold text-spk-blue capitalize">
-            {activeSubTab === 'inventory' ? 'จัดการรายการครุภัณฑ์' : 
-             activeSubTab === 'categories' ? 'จัดการหมวดหมู่สินค้า' : 
-             activeSubTab === 'maintenance' ? 'จัดการข้อมูลซ่อมบำรุง' :
-             activeSubTab === 'users' ? 'จัดการข้อมูลผู้ใช้งาน' :
-             activeSubTab === 'students' ? 'จัดการข้อมูลนักเรียน' :
-             'จัดการรายการแจ้งซ่อม'}
-          </h3>
+          <div className="flex flex-col gap-1">
+            <h3 className="text-lg font-bold text-spk-blue capitalize">
+              {activeSubTab === 'inventory' ? 'จัดการรายการครุภัณฑ์' : 
+               activeSubTab === 'categories' ? 'จัดการหมวดหมู่สินค้า' : 
+               activeSubTab === 'maintenance' ? 'จัดการข้อมูลซ่อมบำรุง' :
+               activeSubTab === 'users' ? 'จัดการข้อมูลผู้ใช้งาน' :
+               activeSubTab === 'students' ? 'จัดการข้อมูลนักเรียน' :
+               'จัดการรายการแจ้งซ่อม'}
+            </h3>
+            {activeSubTab === 'students' && (
+              <div className="flex gap-2 mt-2">
+                <select 
+                  value={studentGradeFilter} 
+                  onChange={(e) => setStudentGradeFilter(e.target.value)}
+                  className="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-spk-blue"
+                >
+                  <option value="all">ทุกระดับชั้น</option>
+                  <option value="ม.4">ม.4</option>
+                  <option value="ม.5">ม.5</option>
+                  <option value="ม.6">ม.6</option>
+                </select>
+                <input 
+                  type="text" 
+                  placeholder="ค้นหาชื่อ/รหัส..." 
+                  value={studentSearchTerm}
+                  onChange={(e) => setStudentSearchTerm(e.target.value)}
+                  className="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-spk-blue w-40"
+                />
+              </div>
+            )}
+          </div>
           <button 
             onClick={() => { setEditingItem(null); setIsModalOpen(true); }}
             className="btn-primary flex items-center gap-2 py-2"
@@ -215,7 +240,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ devices, categories, onUpdate, 
                   </td>
                 </tr>
               ))}
-              {activeSubTab === 'students' && devices.students?.map((student) => (
+              {activeSubTab === 'students' && devices.students?.filter(s => {
+                const matchesGrade = studentGradeFilter === 'all' || s.grade === studentGradeFilter;
+                const matchesSearch = s.fullName.toLowerCase().includes(studentSearchTerm.toLowerCase()) || 
+                                    s.studentId.toString().includes(studentSearchTerm);
+                return matchesGrade && matchesSearch;
+              }).map((student) => (
                 <tr key={student.studentId} className="hover:bg-spk-gray/30 transition-colors group">
                   <td className="px-6 py-4">
                     <p className="font-bold text-gray-800">{student.fullName}</p>

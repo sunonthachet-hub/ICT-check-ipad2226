@@ -21,29 +21,42 @@ const BorrowReturn: React.FC<BorrowReturnProps> = ({ devices, currentUser, onUpd
   const scannerRef = useRef<Html5QrcodeScanner | null>(null);
 
   useEffect(() => {
+    let scanner: Html5QrcodeScanner | null = null;
+
     if (isScannerOpen) {
-      const scanner = new Html5QrcodeScanner(
-        "reader",
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        /* verbose= */ false
-      );
-      
-      scanner.render((decodedText) => {
-        setSearchTerm(decodedText);
-        setIsScannerOpen(false);
-        scanner.clear();
-      }, () => {
-        // Ignore errors during scanning
-      });
+      // Small delay to ensure the DOM element #reader is mounted and ready
+      const timer = setTimeout(() => {
+        try {
+          const element = document.getElementById("reader");
+          if (element) {
+            scanner = new Html5QrcodeScanner(
+              "reader",
+              { fps: 10, qrbox: { width: 250, height: 250 } },
+              /* verbose= */ false
+            );
+            
+            scanner.render((decodedText) => {
+              setSearchTerm(decodedText);
+              setIsScannerOpen(false);
+            }, () => {
+              // Ignore errors during scanning
+            });
 
-      scannerRef.current = scanner;
+            scannerRef.current = scanner;
+          }
+        } catch (err) {
+          console.error("Scanner initialization failed", err);
+        }
+      }, 300);
+
+      return () => {
+        clearTimeout(timer);
+        if (scanner) {
+          scanner.clear().catch(err => console.warn("Failed to clear scanner", err));
+          scannerRef.current = null;
+        }
+      };
     }
-
-    return () => {
-      if (scannerRef.current) {
-        scannerRef.current.clear().catch(err => console.error("Failed to clear scanner", err));
-      }
-    };
   }, [isScannerOpen]);
 
   const filteredDevices = devices.filter(d => {

@@ -13,6 +13,7 @@ import BorrowReturn from './components/BorrowReturn';
 import AdminPanel from './components/Admin';
 import Service from './components/Service';
 import Logs from './components/Logs';
+import StudentsRegistry from './components/StudentsRegistry';
 
 const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -65,12 +66,14 @@ const App: React.FC = () => {
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [devicesRes, categoriesRes, usersRes, maintenanceRes, studentsRes, serviceRes] = await Promise.all([
+      const [devicesRes, categoriesRes, usersRes, maintenanceRes, studentsRes, studentsM5Res, studentsM6Res, serviceRes] = await Promise.all([
         gasHelper('read', 'Devices'),
         gasHelper('read', 'Categories'),
         gasHelper('read', 'Users'),
         gasHelper('read', 'Maintenance'),
         gasHelper('read', 'Students'),
+        gasHelper('read', 'StudentsM5'),
+        gasHelper('read', 'StudentsM6'),
         gasHelper('read', 'Service')
       ]);
 
@@ -96,7 +99,14 @@ const App: React.FC = () => {
 
         extendedDevices.users = usersRes.data as User[];
         extendedDevices.maintenance = maintenanceRes.data as MaintenanceRecord[];
-        extendedDevices.students = studentsRes.data as Student[];
+        
+        // Combine all student data
+        const allStudents = [
+          ...(studentsRes.data as Student[] || []),
+          ...(studentsM5Res.data as Student[] || []),
+          ...(studentsM6Res.data as Student[] || [])
+        ];
+        extendedDevices.students = allStudents;
         extendedDevices.serviceReports = serviceRes.data as ServiceReport[];
 
         setCategories(loadedCategories);
@@ -178,6 +188,8 @@ const App: React.FC = () => {
         return <BorrowReturn devices={devices} currentUser={currentUser} onUpdate={loadData} t={t} />;
       case 'service':
         return <Service devices={devices} currentUser={currentUser} t={t} />;
+      case 'students':
+        return <StudentsRegistry students={(devices as any).students || []} t={t} />;
       case 'logs':
         return <Logs t={t} />;
       case 'admin':

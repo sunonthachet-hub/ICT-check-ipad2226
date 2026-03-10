@@ -97,9 +97,9 @@ function login(data) {
 function readData(sheetName) {
   const sheet = SS.getSheetByName(sheetName);
   if (!sheet) {
-    if (sheetName === 'Students') {
-      const newSheet = SS.insertSheet('Students');
-      newSheet.appendRow(['studentId', 'fullName', 'grade', 'classroom']);
+    if (sheetName === 'Students' || sheetName === 'StudentsM5' || sheetName === 'StudentsM6') {
+      const newSheet = SS.insertSheet(sheetName);
+      newSheet.appendRow(['studentId', 'fullName', 'grade', 'classroom', 'email']);
       return [];
     }
     return [];

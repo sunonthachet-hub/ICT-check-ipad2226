@@ -21,6 +21,7 @@ export const translations = {
     db_disconnected: 'ไม่ได้เชื่อมต่อฐานข้อมูล',
     service: 'แจ้งซ่อม',
     logs: 'ประวัติการใช้งาน',
+    studentsRegistry: 'ทะเบียนรายชื่อ',
   },
   en: {
     dashboard: 'Dashboard',
@@ -44,5 +45,6 @@ export const translations = {
     db_disconnected: 'Database Disconnected',
     service: 'Repair Service',
     logs: 'Activity Logs',
+    studentsRegistry: 'Students Registry',
   }
 };
