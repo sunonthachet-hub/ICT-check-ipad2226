@@ -159,9 +159,9 @@ const BorrowReturn: React.FC<BorrowReturnProps> = ({ devices, currentUser, onUpd
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
               </div>
               <button 
-                onClick={() => setIsScannerOpen(true)}
-                className="bg-spk-blue text-white p-4 rounded-xl shadow-lg hover:bg-blue-900 transition-all flex items-center justify-center cursor-pointer"
-                title="Scan QR/Barcode"
+                disabled
+                className="bg-gray-200 text-gray-400 p-4 rounded-xl flex items-center justify-center cursor-not-allowed"
+                title="ระบบกำลังพัฒนา"
               >
                 <Camera className="w-6 h-6" />
               </button>
