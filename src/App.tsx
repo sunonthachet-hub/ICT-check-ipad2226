@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { User, Device, Category, UserRole, DeviceStatus, TranslationKey, MaintenanceRecord } from './types';
+import { User, Device, Category, UserRole, DeviceStatus, TranslationKey, MaintenanceRecord, Student, ServiceReport } from './types';
 import { translations } from './constants';
 import { gasHelper } from './services/gasService';
 
@@ -11,6 +11,8 @@ import Dashboard from './components/Dashboard';
 import Inventory from './components/Inventory';
 import BorrowReturn from './components/BorrowReturn';
 import AdminPanel from './components/Admin';
+import Service from './components/Service';
+import Logs from './components/Logs';
 
 const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -63,11 +65,13 @@ const App: React.FC = () => {
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [devicesRes, categoriesRes, usersRes, maintenanceRes] = await Promise.all([
+      const [devicesRes, categoriesRes, usersRes, maintenanceRes, studentsRes, serviceRes] = await Promise.all([
         gasHelper('read', 'Devices'),
         gasHelper('read', 'Categories'),
         gasHelper('read', 'Users'),
-        gasHelper('read', 'Maintenance')
+        gasHelper('read', 'Maintenance'),
+        gasHelper('read', 'Students'),
+        gasHelper('read', 'Service')
       ]);
 
       if (devicesRes.success && categoriesRes.success) {
@@ -86,10 +90,14 @@ const App: React.FC = () => {
         const extendedDevices = loadedDevices as Device[] & {
           users?: User[];
           maintenance?: MaintenanceRecord[];
+          students?: Student[];
+          serviceReports?: ServiceReport[];
         };
 
         extendedDevices.users = usersRes.data as User[];
         extendedDevices.maintenance = maintenanceRes.data as MaintenanceRecord[];
+        extendedDevices.students = studentsRes.data as Student[];
+        extendedDevices.serviceReports = serviceRes.data as ServiceReport[];
 
         setCategories(loadedCategories);
         setDevices(extendedDevices);
@@ -168,6 +176,10 @@ const App: React.FC = () => {
         return <Inventory devices={devices} categories={categories} t={t} />;
       case 'borrow':
         return <BorrowReturn devices={devices} currentUser={currentUser} onUpdate={loadData} t={t} />;
+      case 'service':
+        return <Service devices={devices} currentUser={currentUser} t={t} />;
+      case 'logs':
+        return <Logs t={t} />;
       case 'admin':
         return (currentUser.role === UserRole.Admin || currentUser.role === UserRole.Staff) ? (
           <AdminPanel devices={devices} categories={categories} onUpdate={loadData} t={t} />

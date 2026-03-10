@@ -72,7 +72,8 @@ const BorrowReturn: React.FC<BorrowReturnProps> = ({ devices, currentUser, onUpd
           deviceId: device.id,
           userFid,
           userName,
-          snDevice: device.serial_number
+          snDevice: device.serial_number,
+          userRole: currentUser.role
         });
 
         if (result.success) {
@@ -83,12 +84,9 @@ const BorrowReturn: React.FC<BorrowReturnProps> = ({ devices, currentUser, onUpd
         }
       } else {
         // Return logic
-        const result = await gasHelper('update', 'Devices', {
-          id: device.id,
-          status: DeviceStatus.Available,
-          borrowedBy: '',
-          borrowDate: '',
-          dueDate: ''
+        const result = await gasHelper('returnDevice', null, {
+          deviceId: device.id,
+          snDevice: device.serial_number
         });
 
         if (result.success) {

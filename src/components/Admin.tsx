@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Device, Category, DeviceStatus, TranslationKey, User, Student, Teacher, MaintenanceRecord } from '../types';
+import { Device, Category, DeviceStatus, TranslationKey, User, Student, Teacher, MaintenanceRecord, ServiceReport } from '../types';
 import { Plus, Edit2, Trash2, Package, Tag, Users, X, Settings } from 'lucide-react';
 import { gasHelper } from '../services/gasService';
 
@@ -9,6 +9,7 @@ interface AdminPanelProps {
     teachers?: Teacher[];
     students?: Student[];
     maintenance?: MaintenanceRecord[];
+    serviceReports?: ServiceReport[];
   };
   categories: Category[];
   onUpdate: () => void;
@@ -16,11 +17,11 @@ interface AdminPanelProps {
 }
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ devices, categories, onUpdate, t }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'inventory' | 'categories' | 'maintenance' | 'users'>('inventory');
+  const [activeSubTab, setActiveSubTab] = useState<'inventory' | 'categories' | 'maintenance' | 'users' | 'students' | 'service'>('inventory');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Device | Category | MaintenanceRecord | User | null>(null);
 
-  const handleDelete = async (type: 'Devices' | 'Categories', id: string) => {
+  const handleDelete = async (type: 'Devices' | 'Categories' | 'Users' | 'Students' | 'Service', id: string) => {
     if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการลบรายการนี้?')) return;
     
     const result = await gasHelper('delete', type, { id });
@@ -69,6 +70,20 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ devices, categories, onUpdate, 
             <Users className="w-4 h-4" />
             ผู้ใช้งาน
           </button>
+          <button
+            onClick={() => setActiveSubTab('students')}
+            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${activeSubTab === 'students' ? 'bg-spk-blue text-white shadow-md' : 'text-gray-400 hover:text-gray-600 cursor-pointer'}`}
+          >
+            <Users className="w-4 h-4" />
+            นักเรียน
+          </button>
+          <button
+            onClick={() => setActiveSubTab('service')}
+            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${activeSubTab === 'service' ? 'bg-spk-blue text-white shadow-md' : 'text-gray-400 hover:text-gray-600 cursor-pointer'}`}
+          >
+            <Settings className="w-4 h-4" />
+            รายการแจ้งซ่อม
+          </button>
         </div>
       </header>
 
@@ -79,7 +94,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ devices, categories, onUpdate, 
             {activeSubTab === 'inventory' ? 'จัดการรายการครุภัณฑ์' : 
              activeSubTab === 'categories' ? 'จัดการหมวดหมู่สินค้า' : 
              activeSubTab === 'maintenance' ? 'จัดการข้อมูลซ่อมบำรุง' :
-             'จัดการข้อมูลผู้ใช้งาน'}
+             activeSubTab === 'users' ? 'จัดการข้อมูลผู้ใช้งาน' :
+             activeSubTab === 'students' ? 'จัดการข้อมูลนักเรียน' :
+             'จัดการรายการแจ้งซ่อม'}
           </h3>
           <button 
             onClick={() => { setEditingItem(null); setIsModalOpen(true); }}
@@ -193,7 +210,54 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ devices, categories, onUpdate, 
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button onClick={() => { setEditingItem(user); setIsModalOpen(true); }} className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg cursor-pointer"><Edit2 className="w-4 h-4" /></button>
-                      <button onClick={() => handleDelete('Users' as unknown as 'Devices', user.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg cursor-pointer"><Trash2 className="w-4 h-4" /></button>
+                      <button onClick={() => handleDelete('Users', user.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg cursor-pointer"><Trash2 className="w-4 h-4" /></button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {activeSubTab === 'students' && devices.students?.map((student) => (
+                <tr key={student.studentId} className="hover:bg-spk-gray/30 transition-colors group">
+                  <td className="px-6 py-4">
+                    <p className="font-bold text-gray-800">{student.fullName}</p>
+                    <p className="text-[10px] text-gray-400 font-mono uppercase tracking-wider">ID: {student.studentId}</p>
+                  </td>
+                  <td className="px-6 py-4">
+                    <p className="text-xs text-gray-500">ชั้น: <span className="font-medium">{student.grade}/{student.classroom}</span></p>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="text-xs text-gray-400">{student.email}</span>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={() => { setEditingItem(student as any); setIsModalOpen(true); }} className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg cursor-pointer"><Edit2 className="w-4 h-4" /></button>
+                      <button onClick={() => handleDelete('Students', student.studentId)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg cursor-pointer"><Trash2 className="w-4 h-4" /></button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {activeSubTab === 'service' && devices.serviceReports?.map((report) => (
+                <tr key={report.id} className="hover:bg-spk-gray/30 transition-colors group">
+                  <td className="px-6 py-4">
+                    <p className="font-bold text-gray-800">{report.issue_type}</p>
+                    <p className="text-[10px] text-gray-400 font-mono uppercase tracking-wider">Device: {report.deviceId}</p>
+                  </td>
+                  <td className="px-6 py-4">
+                    <p className="text-xs text-gray-400 truncate max-w-xs">{report.details}</p>
+                    <p className="text-[10px] text-gray-400 mt-1">{report.reportedAt}</p>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${
+                      report.status === 'Resolved' ? 'bg-green-100 text-green-700' : 
+                      report.status === 'In Progress' ? 'bg-blue-100 text-blue-700' : 
+                      'bg-yellow-100 text-yellow-700'
+                    }`}>
+                      {report.status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={() => { setEditingItem(report as any); setIsModalOpen(true); }} className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg cursor-pointer"><Edit2 className="w-4 h-4" /></button>
+                      <button onClick={() => handleDelete('Service', report.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg cursor-pointer"><Trash2 className="w-4 h-4" /></button>
                     </div>
                   </td>
                 </tr>

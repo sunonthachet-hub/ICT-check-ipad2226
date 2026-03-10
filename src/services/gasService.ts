@@ -1,4 +1,4 @@
-export const gasHelper = async (action: string, sheetName: string | null, data?: any): Promise<any> => {
+export const gasHelper = async (action: string, sheetName: string | null, data?: any, currentUser?: any): Promise<any> => {
   const GAS_URL = import.meta.env.VITE_GAS_URL;
   
   if (!GAS_URL) {
@@ -16,7 +16,7 @@ export const gasHelper = async (action: string, sheetName: string | null, data?:
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ action, sheetName, data }),
+      body: JSON.stringify({ action, sheetName, data, currentUser }),
     });
 
     if (!response.ok) throw new Error('Network response was not ok');

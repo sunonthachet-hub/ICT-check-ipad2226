@@ -37,6 +37,15 @@ function doPost(e) {
       case 'importTransactions':
         result = importTransactions(data, user);
         break;
+      case 'borrowDevice':
+        result = borrowDevice(data, user);
+        break;
+      case 'returnDevice':
+        result = returnDevice(data, user);
+        break;
+      case 'reportService':
+        result = reportService(data, user);
+        break;
       default:
         throw new Error('Action not found: ' + action);
     }
@@ -87,7 +96,14 @@ function login(data) {
  */
 function readData(sheetName) {
   const sheet = SS.getSheetByName(sheetName);
-  if (!sheet) return [];
+  if (!sheet) {
+    if (sheetName === 'Students') {
+      const newSheet = SS.insertSheet('Students');
+      newSheet.appendRow(['studentId', 'fullName', 'grade', 'classroom']);
+      return [];
+    }
+    return [];
+  }
   
   const values = sheet.getDataRange().getDisplayValues(); 
   const headers = values[0];
@@ -117,14 +133,14 @@ function updateData(sheetName, data, user) {
   
   // ค้นหาแถวที่จะอัปเดต
   let rowIndex = -1;
-  const key = data.serial_number || data.id || data.email || data.fid || data.studentId || data.borrowerId;
+  const key = data.serial_number || data.id || data.email || data.fid || data.studentId || data.borrowerId || data.snDevice;
 
-  // สำหรับ Transactions เราอาจต้องการหาแถวที่ serial_number ตรงกันและสถานะยังเป็น Borrowed
+  // สำหรับ Transactions เราอาจต้องการหาแถวที่ snDevice ตรงกันและสถานะยังเป็น Borrowed
   if (sheetName === 'Transactions' && data.status === 'Returned') {
-    const snIdx = headers.indexOf('serial_number');
+    const snIdx = headers.indexOf('snDevice') !== -1 ? headers.indexOf('snDevice') : headers.indexOf('serial_number');
     const statusIdx = headers.indexOf('status');
     for (let i = values.length - 1; i >= 1; i--) {
-      if (values[i][snIdx] === data.serial_number && values[i][statusIdx] === 'Borrowed') {
+      if (values[i][snIdx] === (data.snDevice || data.serial_number) && values[i][statusIdx] === 'Borrowed') {
         rowIndex = i + 1;
         break;
       }
@@ -191,11 +207,15 @@ function importTransactions(data, user) {
       if (!item.emailId || item.emailId === "") item.emailId = "ยังไม่ระบุ";
       if (!item.borrowNotes || item.borrowNotes === "") item.borrowNotes = "ยังไม่ระบุ";
       
-      // คำนวณ due_date ถ้าไม่มี (บวก 14 วัน)
-      if (!item.due_date && item.borrowDate) {
-        const bDate = new Date(item.borrowDate);
+      // คำนวณ due_date ถ้าไม่มี (นักเรียน 3 ปี, อื่นๆ 14 วัน)
+      if (!item.due_date && (item.borrowDate || item.borrow_date)) {
+        const bDate = new Date(item.borrowDate || item.borrow_date);
         if (!isNaN(bDate.getTime())) {
-          bDate.setDate(bDate.getDate() + 14);
+          if (item.role === 'Student' || item.userRole === 'Student') {
+            bDate.setFullYear(bDate.getFullYear() + 3);
+          } else {
+            bDate.setDate(bDate.getDate() + 14);
+          }
           item.due_date = Utilities.formatDate(bDate, Session.getScriptTimeZone(), "yyyy-MM-dd");
         }
       }
@@ -205,10 +225,11 @@ function importTransactions(data, user) {
       sheet.appendRow(row);
 
       // 3. อัปเดตสถานะใน Devices
-      if (item.serial_number && item.status) {
+      const sn = item.snDevice || item.serial_number;
+      if (sn && item.status) {
         let found = false;
         for (let i = 1; i < devValues.length; i++) {
-          if (devValues[i][devSerialIdx] === item.serial_number) {
+          if (devValues[i][devSerialIdx] === sn) {
             const newStatus = item.status === 'Borrowed' ? 'Borrowed' : 'Available';
             devSheet.getRange(i + 1, devStatusIdx + 1).setValue(newStatus);
             found = true;
@@ -227,10 +248,141 @@ function importTransactions(data, user) {
   return { success: true, successCount, failCount, errors };
 }
 
+function borrowDevice(data, user) {
+  const trxSheet = SS.getSheetByName('Transactions');
+  const devSheet = SS.getSheetByName('Devices');
+  
+  if (!trxSheet || !devSheet) throw new Error('Sheets not found');
+
+  // 1. Calculate Dates
+  const now = new Date();
+  const borrowDate = Utilities.formatDate(now, Session.getScriptTimeZone(), "yyyy-MM-dd");
+  const borrowTime = Utilities.formatDate(now, Session.getScriptTimeZone(), "HH:mm:ss");
+  
+  let dueDate = new Date(now);
+  if (data.userRole === 'Student') {
+    dueDate.setFullYear(dueDate.getFullYear() + 3);
+  } else {
+    dueDate.setDate(dueDate.getDate() + 14);
+  }
+  const dueDateStr = Utilities.formatDate(dueDate, Session.getScriptTimeZone(), "yyyy-MM-dd");
+  
+  // 2. Prepare Transaction Data
+  const trxData = {
+    borrowerId: 'TRX-' + Date.now(),
+    fid: data.userFid,
+    fname: data.userName,
+    snDevice: data.snDevice,
+    borrow_date: borrowDate,
+    borrowTime: borrowTime,
+    due_date: dueDateStr,
+    status: 'Borrowed',
+    recorder: user ? (user.username || user.email) : 'System',
+    emailId: data.emailId || "ยังไม่ระบุ",
+    borrowNotes: data.borrowNotes || "ยังไม่ระบุ"
+  };
+  
+  // 3. Append to Transactions
+  const trxHeaders = trxSheet.getRange(1, 1, 1, trxSheet.getLastColumn()).getValues()[0];
+  const trxRow = trxHeaders.map(h => trxData[h] !== undefined ? trxData[h] : "");
+  trxSheet.appendRow(trxRow);
+  
+  // 4. Update Device Status
+  const devValues = devSheet.getDataRange().getValues();
+  const devHeaders = devValues[0];
+  const idIdx = devHeaders.indexOf('id');
+  const statusIdx = devHeaders.indexOf('status');
+  
+  for (let i = 1; i < devValues.length; i++) {
+    if (devValues[i][idIdx].toString() === data.deviceId.toString()) {
+      devSheet.getRange(i + 1, statusIdx + 1).setValue('Borrowed');
+      break;
+    }
+  }
+  
+  logAction(user, 'BORROW', 'Transactions', JSON.stringify(trxData));
+  return { success: true };
+}
+
+function returnDevice(data, user) {
+  const trxSheet = SS.getSheetByName('Transactions');
+  const devSheet = SS.getSheetByName('Devices');
+  
+  if (!trxSheet || !devSheet) throw new Error('Sheets not found');
+
+  const now = new Date();
+  const returnDate = Utilities.formatDate(now, Session.getScriptTimeZone(), "yyyy-MM-dd");
+
+  // 1. Update Transactions
+  const trxValues = trxSheet.getDataRange().getDisplayValues();
+  const trxHeaders = trxValues[0];
+  const snIdx = trxHeaders.indexOf('snDevice') !== -1 ? trxHeaders.indexOf('snDevice') : trxHeaders.indexOf('serial_number');
+  const statusIdx = trxHeaders.indexOf('status');
+  const returnDateIdx = trxHeaders.indexOf('return_date');
+  
+  let foundTrx = false;
+  for (let i = trxValues.length - 1; i >= 1; i--) {
+    if (trxValues[i][snIdx] === data.snDevice && trxValues[i][statusIdx] === 'Borrowed') {
+      if (returnDateIdx !== -1) {
+        trxSheet.getRange(i + 1, returnDateIdx + 1).setValue(returnDate);
+      }
+      trxSheet.getRange(i + 1, statusIdx + 1).setValue('Returned');
+      foundTrx = true;
+      break;
+    }
+  }
+
+  // 2. Update Devices
+  const devValues = devSheet.getDataRange().getValues();
+  const devHeaders = devValues[0];
+  const idIdx = devHeaders.indexOf('id');
+  const devStatusIdx = devHeaders.indexOf('status');
+  
+  for (let i = 1; i < devValues.length; i++) {
+    if (devValues[i][idIdx].toString() === data.deviceId.toString()) {
+      devSheet.getRange(i + 1, devStatusIdx + 1).setValue('Available');
+      break;
+    }
+  }
+
+  logAction(user, 'RETURN', 'Transactions', `Returned device ${data.snDevice}`);
+  return { success: true };
+}
+
 function logAction(user, action, target, details) {
   const sheet = SS.getSheetByName('Logs') || SS.insertSheet('Logs');
   if (sheet.getLastRow() === 0) {
-    sheet.appendRow(['Timestamp', 'User', 'Action', 'Target', 'Details']);
+    sheet.appendRow(['timestamp', 'user', 'action', 'target', 'details']);
   }
-  sheet.appendRow([new Date(), user ? (user.email || user.name) : 'System', action, target, details]);
+  const timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
+  const userName = user ? (user.fullName || user.username || user.email || user.users) : 'System';
+  sheet.appendRow([timestamp, userName, action, target, details]);
+}
+
+function reportService(data, user) {
+  const sheet = SS.getSheetByName('Service') || SS.insertSheet('Service');
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(['id', 'deviceId', 'issue_type', 'details', 'email', 'photo_url', 'reportedAt', 'status']);
+  }
+  
+  const id = 'SRV-' + Date.now();
+  const reportedAt = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
+  
+  const rowData = {
+    id: id,
+    deviceId: data.deviceId,
+    issue_type: data.issue_type,
+    details: data.details,
+    email: data.email || (user ? user.email : ""),
+    photo_url: data.photo_url || "",
+    reportedAt: reportedAt,
+    status: 'Pending'
+  };
+  
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const row = headers.map(h => rowData[h] !== undefined ? rowData[h] : "");
+  sheet.appendRow(row);
+  
+  logAction(user, 'REPORT_SERVICE', 'Service', JSON.stringify(rowData));
+  return { success: true, id: id };
 }

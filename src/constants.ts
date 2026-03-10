@@ -19,6 +19,8 @@ export const translations = {
     admin_login: 'เข้าสู่ระบบผู้ดูแล',
     db_connected: 'เชื่อมต่อฐานข้อมูลแล้ว',
     db_disconnected: 'ไม่ได้เชื่อมต่อฐานข้อมูล',
+    service: 'แจ้งซ่อม',
+    logs: 'ประวัติการใช้งาน',
   },
   en: {
     dashboard: 'Dashboard',
@@ -40,5 +42,7 @@ export const translations = {
     admin_login: 'Admin Login',
     db_connected: 'Database Connected',
     db_disconnected: 'Database Disconnected',
+    service: 'Repair Service',
+    logs: 'Activity Logs',
   }
 };

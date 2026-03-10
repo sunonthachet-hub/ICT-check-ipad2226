@@ -85,13 +85,22 @@ export interface MaintenanceRecord {
 }
 
 export interface ServiceReport {
-  id?: string;
-  device_id: string;
+  id: string;
+  deviceId: string;
   issue_type: string;
   details: string;
-  image_url?: string;
-  report_date: string;
+  email: string;
+  photo_url: string;
+  reportedAt: string;
   status: 'Pending' | 'In Progress' | 'Resolved';
+}
+
+export interface ActivityLog {
+  timestamp: string;
+  user: string;
+  action: string;
+  target: string;
+  details: string;
 }
 
 export interface Transaction {
