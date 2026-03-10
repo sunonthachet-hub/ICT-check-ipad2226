@@ -97,9 +97,24 @@ function login(data) {
 function readData(sheetName) {
   const sheet = SS.getSheetByName(sheetName);
   if (!sheet) {
+    if (sheetName === 'Users') {
+      const newSheet = SS.insertSheet(sheetName);
+      newSheet.appendRow(['users', 'password', 'name', 'role']);
+      return [];
+    }
     if (sheetName === 'Students' || sheetName === 'StudentsM5' || sheetName === 'StudentsM6') {
       const newSheet = SS.insertSheet(sheetName);
       newSheet.appendRow(['studentId', 'fullName', 'grade', 'classroom', 'email']);
+      return [];
+    }
+    if (sheetName === 'Teachers') {
+      const newSheet = SS.insertSheet(sheetName);
+      newSheet.appendRow(['id', 'fullName', 'department', 'email', 'profileImageUrl', 'classroom']);
+      return [];
+    }
+    if (sheetName === 'serviceLogs') {
+      const newSheet = SS.insertSheet(sheetName);
+      newSheet.appendRow(['id', 'product_id', 'issue', 'report_date', 'status']);
       return [];
     }
     return [];
@@ -249,10 +264,15 @@ function importTransactions(data, user) {
 }
 
 function borrowDevice(data, user) {
-  const trxSheet = SS.getSheetByName('Transactions');
+  const trxSheet = SS.getSheetByName('Transactions') || SS.insertSheet('Transactions');
   const devSheet = SS.getSheetByName('Devices');
   
   if (!trxSheet || !devSheet) throw new Error('Sheets not found');
+
+  // Ensure Transactions headers exist
+  if (trxSheet.getLastRow() === 0) {
+    trxSheet.appendRow(['borrowerId', 'fid', 'fname', 'snDevice', 'borrow_date', 'borrowTime', 'due_date', 'return_date', 'status', 'recorder', 'emailId', 'borrowNotes', 'accessories']);
+  }
 
   // 1. Calculate Dates
   const now = new Date();
@@ -261,12 +281,18 @@ function borrowDevice(data, user) {
   const borrowTime = Utilities.formatDate(now, timezone, "HH:mm:ss");
   
   let dueDate = new Date(now);
-  if (data.userRole === 'Student') {
+  if (data.userGrade === 'ม.4') {
     dueDate.setFullYear(dueDate.getFullYear() + 3);
+  } else if (data.userGrade === 'ม.5') {
+    dueDate.setFullYear(dueDate.getFullYear() + 2);
+  } else if (data.userGrade === 'ม.6') {
+    dueDate.setFullYear(dueDate.getFullYear() + 1);
+  } else if (data.userRole === 'Student') {
+    dueDate.setFullYear(dueDate.getFullYear() + 3); // Default for students if grade not specified
   } else {
-    dueDate.setDate(dueDate.getDate() + 14);
+    dueDate.setDate(dueDate.getDate() + 14); // Default 14 days for others
   }
-  const dueDateStr = Utilities.formatDate(dueDate, Session.getScriptTimeZone(), "yyyy-MM-dd");
+  const dueDateStr = Utilities.formatDate(dueDate, timezone, "yyyy-MM-dd");
   
   // 2. Prepare Transaction Data
   const trxData = {
@@ -278,9 +304,10 @@ function borrowDevice(data, user) {
     borrowTime: borrowTime,
     due_date: dueDateStr,
     status: 'Borrowed',
-    recorder: user ? (user.username || user.email) : 'System',
+    recorder: data.recorder || (user ? (user.name || user.users) : 'System'),
     emailId: data.emailId || "ยังไม่ระบุ",
-    borrowNotes: data.borrowNotes || "ยังไม่ระบุ"
+    borrowNotes: data.borrowNotes || "ยังไม่ระบุ",
+    accessories: data.accessories || ""
   };
   
   // 3. Append to Transactions
@@ -293,10 +320,14 @@ function borrowDevice(data, user) {
   const devHeaders = devValues[0];
   const idIdx = devHeaders.indexOf('id');
   const statusIdx = devHeaders.indexOf('status');
+  const borrowedByIdx = devHeaders.indexOf('borrowedBy'); // Check if borrowedBy exists
   
   for (let i = 1; i < devValues.length; i++) {
     if (devValues[i][idIdx].toString() === data.deviceId.toString()) {
       devSheet.getRange(i + 1, statusIdx + 1).setValue('Borrowed');
+      if (borrowedByIdx !== -1) {
+        devSheet.getRange(i + 1, borrowedByIdx + 1).setValue(data.userName);
+      }
       break;
     }
   }
@@ -312,7 +343,8 @@ function returnDevice(data, user) {
   if (!trxSheet || !devSheet) throw new Error('Sheets not found');
 
   const now = new Date();
-  const returnDate = Utilities.formatDate(now, Session.getScriptTimeZone(), "yyyy-MM-dd");
+  const timezone = "GMT+7";
+  const returnDate = Utilities.formatDate(now, timezone, "yyyy-MM-dd");
 
   // 1. Update Transactions
   const trxValues = trxSheet.getDataRange().getDisplayValues();
@@ -338,15 +370,19 @@ function returnDevice(data, user) {
   const devHeaders = devValues[0];
   const idIdx = devHeaders.indexOf('id');
   const devStatusIdx = devHeaders.indexOf('status');
+  const borrowedByIdx = devHeaders.indexOf('borrowedBy');
   
   for (let i = 1; i < devValues.length; i++) {
     if (devValues[i][idIdx].toString() === data.deviceId.toString()) {
       devSheet.getRange(i + 1, devStatusIdx + 1).setValue('Available');
+      if (borrowedByIdx !== -1) {
+        devSheet.getRange(i + 1, borrowedByIdx + 1).setValue('');
+      }
       break;
     }
   }
 
-  logAction(user, 'RETURN', 'Transactions', `Returned device ${data.snDevice}`);
+  logAction(user, 'RETURN', 'Transactions', `Returned device ${data.snDevice} (Recorder: ${data.recorder || 'System'})`);
   return { success: true };
 }
 

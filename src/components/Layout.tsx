@@ -66,10 +66,10 @@ const Layout: React.FC<LayoutProps> = ({ children, currentUser, activeTab, setAc
         <div className="mt-auto pt-6 border-t border-white/10">
           <div className="flex items-center gap-3 mb-6 px-2">
             <div className="w-10 h-10 rounded-full bg-spk-yellow flex items-center justify-center text-spk-blue font-bold overflow-hidden">
-              {(currentUser.fullName || currentUser.users || 'U').charAt(0).toUpperCase()}
+              {(currentUser.name || currentUser.users || 'U').charAt(0).toUpperCase()}
             </div>
             <div className="overflow-hidden">
-              <p className="font-bold truncate">{currentUser.fullName || currentUser.users}</p>
+              <p className="font-bold truncate">{currentUser.name || currentUser.users}</p>
               <p className="text-xs text-white/50 truncate">{currentUser.role}</p>
             </div>
           </div>

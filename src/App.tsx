@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { User, Device, Category, UserRole, DeviceStatus, TranslationKey, MaintenanceRecord, Student, ServiceReport } from './types';
+import { User, Device, Category, UserRole, DeviceStatus, TranslationKey, ServiceLog, Student, ServiceReport, Teacher } from './types';
 import { translations } from './constants';
 import { gasHelper } from './services/gasService';
 
@@ -66,15 +66,16 @@ const App: React.FC = () => {
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [devicesRes, categoriesRes, usersRes, maintenanceRes, studentsRes, studentsM5Res, studentsM6Res, serviceRes] = await Promise.all([
+      const [devicesRes, categoriesRes, usersRes, serviceLogsRes, studentsRes, studentsM5Res, studentsM6Res, serviceRes, teachersRes] = await Promise.all([
         gasHelper('read', 'Devices'),
         gasHelper('read', 'Categories'),
         gasHelper('read', 'Users'),
-        gasHelper('read', 'Maintenance'),
+        gasHelper('read', 'serviceLogs'),
         gasHelper('read', 'Students'),
         gasHelper('read', 'StudentsM5'),
         gasHelper('read', 'StudentsM6'),
-        gasHelper('read', 'Service')
+        gasHelper('read', 'Service'),
+        gasHelper('read', 'Teachers')
       ]);
 
       if (devicesRes.success && categoriesRes.success) {
@@ -92,13 +93,15 @@ const App: React.FC = () => {
 
         const extendedDevices = loadedDevices as Device[] & {
           users?: User[];
-          maintenance?: MaintenanceRecord[];
+          serviceLogs?: ServiceLog[];
           students?: Student[];
           serviceReports?: ServiceReport[];
+          teachers?: Teacher[];
         };
 
         extendedDevices.users = usersRes.data as User[];
-        extendedDevices.maintenance = maintenanceRes.data as MaintenanceRecord[];
+        extendedDevices.serviceLogs = serviceLogsRes.data as ServiceLog[];
+        extendedDevices.teachers = teachersRes.data as Teacher[];
         
         // Combine all student data
         const allStudents = [
@@ -189,7 +192,7 @@ const App: React.FC = () => {
       case 'service':
         return <Service devices={devices} currentUser={currentUser} t={t} />;
       case 'students':
-        return <StudentsRegistry students={(devices as any).students || []} t={t} />;
+        return <StudentsRegistry students={(devices as any).students || []} teachers={(devices as any).teachers || []} t={t} />;
       case 'logs':
         return <Logs t={t} />;
       case 'admin':

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Device, Category, DeviceStatus, TranslationKey, User, Student, Teacher, MaintenanceRecord, ServiceReport, UserRole } from '../types';
-import { Plus, Edit2, Trash2, Package, Tag, Users, X, Settings } from 'lucide-react';
+import { Device, Category, DeviceStatus, TranslationKey, User, Student, Teacher, ServiceLog, ServiceReport, UserRole } from '../types';
+import { Plus, Edit2, Trash2, Package, Tag, Users, X, Settings, GraduationCap, User as UserIcon } from 'lucide-react';
 import { gasHelper } from '../services/gasService';
 import { formatThaiDate } from '../constants';
 
@@ -9,7 +9,7 @@ interface AdminPanelProps {
     users?: User[];
     teachers?: Teacher[];
     students?: Student[];
-    maintenance?: MaintenanceRecord[];
+    serviceLogs?: ServiceLog[];
     serviceReports?: ServiceReport[];
   };
   categories: Category[];
@@ -18,9 +18,9 @@ interface AdminPanelProps {
 }
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ devices, categories, onUpdate, t }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'inventory' | 'categories' | 'maintenance' | 'users' | 'students' | 'service'>('inventory');
+  const [activeSubTab, setActiveSubTab] = useState<'inventory' | 'categories' | 'serviceLogs' | 'users' | 'students' | 'service' | 'teachers'>('inventory');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<Device | Category | MaintenanceRecord | User | null>(null);
+  const [editingItem, setEditingItem] = useState<Device | Category | ServiceLog | User | Teacher | Student | null>(null);
   const [studentGradeFilter, setStudentGradeFilter] = useState<string>('all');
   const [studentSearchTerm, setStudentSearchTerm] = useState<string>('');
 
@@ -32,6 +32,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ devices, categories, onUpdate, 
       if (item.grade === 'ม.5') sheetName = 'StudentsM5';
       else if (item.grade === 'ม.6') sheetName = 'StudentsM6';
     }
+    if (type === 'ServiceLog') sheetName = 'serviceLogs';
 
     const result = await gasHelper('delete', sheetName, { id });
     if (result.success) {
@@ -66,11 +67,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ devices, categories, onUpdate, 
             หมวดหมู่
           </button>
           <button
-            onClick={() => setActiveSubTab('maintenance')}
-            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${activeSubTab === 'maintenance' ? 'bg-spk-blue text-white shadow-md' : 'text-gray-400 hover:text-gray-600 cursor-pointer'}`}
+            onClick={() => setActiveSubTab('serviceLogs')}
+            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${activeSubTab === 'serviceLogs' ? 'bg-spk-blue text-white shadow-md' : 'text-gray-400 hover:text-gray-600 cursor-pointer'}`}
           >
             <Settings className="w-4 h-4" />
-            ซ่อมบำรุง
+            Service Logs
           </button>
           <button
             onClick={() => setActiveSubTab('users')}
@@ -78,6 +79,13 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ devices, categories, onUpdate, 
           >
             <Users className="w-4 h-4" />
             ผู้ใช้งาน
+          </button>
+          <button
+            onClick={() => setActiveSubTab('teachers')}
+            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${activeSubTab === 'teachers' ? 'bg-spk-blue text-white shadow-md' : 'text-gray-400 hover:text-gray-600 cursor-pointer'}`}
+          >
+            <GraduationCap className="w-4 h-4" />
+            คุณครู
           </button>
           <button
             onClick={() => setActiveSubTab('students')}
@@ -103,8 +111,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ devices, categories, onUpdate, 
             <h3 className="text-lg font-bold text-spk-blue capitalize">
               {activeSubTab === 'inventory' ? 'จัดการรายการครุภัณฑ์' : 
                activeSubTab === 'categories' ? 'จัดการหมวดหมู่สินค้า' : 
-               activeSubTab === 'maintenance' ? 'จัดการข้อมูลซ่อมบำรุง' :
+               activeSubTab === 'serviceLogs' ? 'จัดการข้อมูลซ่อมบำรุง' :
                activeSubTab === 'users' ? 'จัดการข้อมูลผู้ใช้งาน' :
+               activeSubTab === 'teachers' ? 'จัดการข้อมูลคุณครู' :
                activeSubTab === 'students' ? 'จัดการข้อมูลนักเรียน' :
                'จัดการรายการแจ้งซ่อม'}
             </h3>
@@ -206,7 +215,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ devices, categories, onUpdate, 
                 </tr>
               ))}
 
-              {activeSubTab === 'maintenance' && devices.maintenance?.map((m) => (
+              {activeSubTab === 'serviceLogs' && devices.serviceLogs?.map((m) => (
                 <tr key={m.id} className="hover:bg-spk-gray/30 transition-colors group">
                   <td className="px-6 py-4">
                     <p className="font-bold text-gray-800">{m.issue}</p>
@@ -223,26 +232,61 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ devices, categories, onUpdate, 
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button onClick={() => { setEditingItem(m); setIsModalOpen(true); }} className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg cursor-pointer"><Edit2 className="w-4 h-4" /></button>
-                      <button onClick={() => handleDelete('Maintenance', m.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg cursor-pointer"><Trash2 className="w-4 h-4" /></button>
+                      <button onClick={() => handleDelete('ServiceLog', m.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg cursor-pointer"><Trash2 className="w-4 h-4" /></button>
                     </div>
                   </td>
                 </tr>
               ))}
               {activeSubTab === 'users' && devices.users?.map((user) => (
-                <tr key={user.id} className="hover:bg-spk-gray/30 transition-colors group">
+                <tr key={user.users} className="hover:bg-spk-gray/30 transition-colors group">
                   <td className="px-6 py-4">
-                    <p className="font-bold text-gray-800">{user.users}</p>
+                    <p className="font-bold text-gray-800">{user.name}</p>
+                    <p className="text-[10px] text-gray-400 font-mono uppercase tracking-wider">User: {user.users}</p>
                   </td>
                   <td className="px-6 py-4">
                     <p className="text-xs text-gray-500">Role: <span className="font-medium">{user.role}</span></p>
                   </td>
                   <td className="px-6 py-4">
-                    <span className="text-xs text-gray-400">ID: {user.id}</span>
+                    <span className="text-xs text-gray-400">-</span>
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button onClick={() => { setEditingItem(user); setIsModalOpen(true); }} className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg cursor-pointer"><Edit2 className="w-4 h-4" /></button>
-                      <button onClick={() => handleDelete('Users', user.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg cursor-pointer"><Trash2 className="w-4 h-4" /></button>
+                      <button onClick={() => handleDelete('Users', user.users)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg cursor-pointer"><Trash2 className="w-4 h-4" /></button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {activeSubTab === 'teachers' && devices.teachers?.map((teacher) => (
+                <tr key={teacher.id} className="hover:bg-spk-gray/30 transition-colors group">
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-gray-100 overflow-hidden">
+                        {teacher.profileImageUrl ? (
+                          <img src={teacher.profileImageUrl} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-gray-50">
+                            <UserIcon className="w-5 h-5 text-gray-300" />
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-bold text-gray-800">{teacher.fullName}</p>
+                        <p className="text-[10px] text-gray-400 font-mono uppercase tracking-wider">ID: {teacher.id}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <p className="text-xs text-gray-500">กลุ่มสาระ: <span className="font-medium">{teacher.department}</span></p>
+                    <p className="text-xs text-gray-500">ห้องเรียน: <span className="font-medium">{teacher.classroom || '-'}</span></p>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="text-xs text-gray-400">{teacher.email}</span>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={() => { setEditingItem(teacher); setIsModalOpen(true); }} className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg cursor-pointer"><Edit2 className="w-4 h-4" /></button>
+                      <button onClick={() => handleDelete('Teachers', teacher.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg cursor-pointer"><Trash2 className="w-4 h-4" /></button>
                     </div>
                   </td>
                 </tr>
@@ -323,10 +367,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ devices, categories, onUpdate, 
                   if (activeSubTab === 'inventory') data.id = 'DEV-' + Date.now();
                   if (activeSubTab === 'categories') data.id = 'CAT-' + Date.now();
                   if (activeSubTab === 'users') data.id = 'USR-' + Date.now();
-                  if (activeSubTab === 'maintenance') data.id = 'MNT-' + Date.now();
+                  if (activeSubTab === 'serviceLogs') data.id = 'MNT-' + Date.now();
+                  if (activeSubTab === 'teachers') data.id = 'TCH-' + Date.now();
                 } else {
-                  data.id = (editingItem as any).id || (editingItem as any).studentId;
+                  data.id = (editingItem as any).id || (editingItem as any).studentId || (editingItem as any).users;
                   if (activeSubTab === 'students') data.studentId = (editingItem as any).studentId;
+                  if (activeSubTab === 'users') data.users = (editingItem as any).users;
                 }
 
                 const action = editingItem ? 'update' : 'append';
@@ -335,7 +381,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ devices, categories, onUpdate, 
                   activeSubTab === 'categories' ? 'Categories' : 
                   activeSubTab === 'users' ? 'Users' : 
                   activeSubTab === 'students' ? 'Students' : 
-                  activeSubTab === 'maintenance' ? 'Maintenance' : 'Service';
+                  activeSubTab === 'teachers' ? 'Teachers' :
+                  activeSubTab === 'serviceLogs' ? 'serviceLogs' : 'Service';
 
                 // Special handling for students split across sheets
                 if (activeSubTab === 'students') {
@@ -390,8 +437,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ devices, categories, onUpdate, 
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-gray-400 uppercase mb-1">สิทธิ์การยืม</label>
-                      <select name="designatedFor" defaultValue={(editingItem as Category)?.designatedFor || UserRole.Student} className="input-field">
-                        {Object.values(UserRole).map(r => <option key={r} value={r}>{r}</option>)}
+                      <select name="designatedFor" defaultValue={(editingItem as Category)?.designatedFor || 'Student'} className="input-field">
+                        <option value="Student">Student</option>
+                        <option value="Teacher">Teacher</option>
+                        <option value="Staff">Staff</option>
+                        <option value="Admin">Admin</option>
                       </select>
                     </div>
                     <div>
@@ -405,21 +455,50 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ devices, categories, onUpdate, 
                   <>
                     <div>
                       <label className="block text-xs font-bold text-gray-400 uppercase mb-1">ชื่อผู้ใช้ (Login)</label>
-                      <input name="users" defaultValue={(editingItem as User)?.users} className="input-field" required />
+                      <input name="users" defaultValue={(editingItem as User)?.users} className="input-field" required disabled={!!editingItem} />
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-gray-400 uppercase mb-1">รหัสผ่าน</label>
                       <input name="password" type="password" className="input-field" required={!editingItem} />
                     </div>
                     <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1">ชื่อ-นามสกุล</label>
+                      <input name="name" defaultValue={(editingItem as User)?.name} className="input-field" required />
+                    </div>
+                    <div>
                       <label className="block text-xs font-bold text-gray-400 uppercase mb-1">บทบาท</label>
-                      <select name="role" defaultValue={(editingItem as User)?.role || UserRole.Student} className="input-field">
+                      <select name="role" defaultValue={(editingItem as User)?.role || UserRole.Staff} className="input-field">
                         {Object.values(UserRole).map(r => <option key={r} value={r}>{r}</option>)}
                       </select>
                     </div>
+                  </>
+                )}
+
+                {activeSubTab === 'teachers' && (
+                  <>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1">รหัสคุณครู</label>
+                      <input name="id" defaultValue={(editingItem as Teacher)?.id} className="input-field" required disabled={!!editingItem} />
+                    </div>
                     <div>
                       <label className="block text-xs font-bold text-gray-400 uppercase mb-1">ชื่อ-นามสกุล</label>
-                      <input name="fullName" defaultValue={(editingItem as User)?.fullName} className="input-field" />
+                      <input name="fullName" defaultValue={(editingItem as Teacher)?.fullName} className="input-field" required />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1">กลุ่มสาระ</label>
+                      <input name="department" defaultValue={(editingItem as Teacher)?.department} className="input-field" required />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1">ห้องเรียนที่ดูแล (เช่น ม.4/1)</label>
+                      <input name="classroom" defaultValue={(editingItem as Teacher)?.classroom} className="input-field" placeholder="ม.4/1" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1">อีเมล</label>
+                      <input name="email" type="email" defaultValue={(editingItem as Teacher)?.email} className="input-field" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1">URL รูปโปรไฟล์</label>
+                      <input name="profileImageUrl" defaultValue={(editingItem as Teacher)?.profileImageUrl} className="input-field" placeholder="https://..." />
                     </div>
                   </>
                 )}
@@ -453,23 +532,23 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ devices, categories, onUpdate, 
                   </>
                 )}
 
-                {activeSubTab === 'maintenance' && (
+                {activeSubTab === 'serviceLogs' && (
                   <>
                     <div>
                       <label className="block text-xs font-bold text-gray-400 uppercase mb-1">รหัสครุภัณฑ์</label>
-                      <input name="product_id" defaultValue={(editingItem as MaintenanceRecord)?.product_id} className="input-field" required />
+                      <input name="product_id" defaultValue={(editingItem as ServiceLog)?.product_id} className="input-field" required />
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-gray-400 uppercase mb-1">อาการเสีย/ปัญหา</label>
-                      <textarea name="issue" defaultValue={(editingItem as MaintenanceRecord)?.issue} className="input-field min-h-[100px]" required />
+                      <textarea name="issue" defaultValue={(editingItem as ServiceLog)?.issue} className="input-field min-h-[100px]" required />
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-gray-400 uppercase mb-1">วันที่แจ้ง</label>
-                      <input name="report_date" type="date" defaultValue={(editingItem as MaintenanceRecord)?.report_date || new Date().toISOString().split('T')[0]} className="input-field" required />
+                      <input name="report_date" type="date" defaultValue={(editingItem as ServiceLog)?.report_date || new Date().toISOString().split('T')[0]} className="input-field" required />
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-gray-400 uppercase mb-1">สถานะ</label>
-                      <select name="status" defaultValue={(editingItem as MaintenanceRecord)?.status || 'Pending'} className="input-field">
+                      <select name="status" defaultValue={(editingItem as ServiceLog)?.status || 'Pending'} className="input-field">
                         <option value="Pending">รอดำเนินการ</option>
                         <option value="In Progress">กำลังซ่อม</option>
                         <option value="Completed">เสร็จสิ้น</option>

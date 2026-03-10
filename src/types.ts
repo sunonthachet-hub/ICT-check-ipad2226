@@ -4,9 +4,7 @@ export type TranslationKey = keyof typeof translations.th;
 
 export enum UserRole {
   Admin = 'Admin',
-  Staff = 'Staff',
-  Student = 'Student',
-  Teacher = 'Teacher'
+  Staff = 'Staff'
 }
 
 export enum DeviceStatus {
@@ -26,24 +24,17 @@ export enum DeviceCategory {
 }
 
 export interface User {
-  id: string;
   users: string;
   password?: string;
+  name: string;
   role: UserRole;
-  username?: string;
-  email?: string;
-  fullName?: string;
-  studentId?: string;
-  department?: string;
-  grade?: string;
-  classroom?: string;
 }
 
 export interface Category {
   id: string;
   name: string;
   description: string;
-  designatedFor: UserRole;
+  designatedFor: string; // Changed to string to support flexible roles if needed, or keep it as UserRole if strictly Admin/Staff
   imageUrl: string;
 }
 
@@ -53,11 +44,12 @@ export interface Device {
   serial_number: string;
   defaultAccessories: string;
   status: DeviceStatus;
+  borrowedBy?: string; // Added to track who currently has the device
   // Hydrated fields for UI
   name?: string;
   categoryName?: string;
   imageUrl?: string;
-  designatedFor?: UserRole;
+  designatedFor?: string;
 }
 
 export interface Student {
@@ -74,9 +66,11 @@ export interface Teacher {
   fullName: string;
   department: string;
   email: string;
+  profileImageUrl?: string;
+  classroom?: string; // Added for mapping to students
 }
 
-export interface MaintenanceRecord {
+export interface ServiceLog {
   id: string;
   product_id: string;
   issue: string;
