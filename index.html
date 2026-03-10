@@ -1102,34 +1102,54 @@
             const [isScannerOpen, setIsScannerOpen] = useState(false);
             const [borrowForm, setBorrowForm] = useState({ email: '', notes: '' });
 
-            const filteredStudents = (students || []).filter(s => 
-                (s.fullName || s.fname || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
-                (s.studentId || s.fid || '').includes(searchTerm)
-            );
+            // Use useMemo to prevent UI freeze when filtering large lists
+            const filteredStudents = useMemo(() => {
+                if (!students) return [];
+                const term = searchTerm.toLowerCase();
+                return students.filter(s => 
+                    (s.fullName || s.fname || '').toLowerCase().includes(term) || 
+                    (s.studentId || s.fid || '').includes(term)
+                ).slice(0, 50); // Limit results for performance
+            }, [students, searchTerm]);
 
-            const filteredDevices = (devices || []).filter(d => {
-                const matchesMode = mode === 'borrow' ? d.status === 'Available' : d.status === 'Borrowed';
-                const matchesSerial = (d.serial_number || '').toLowerCase().includes(serialSearch.toLowerCase());
-                return matchesMode && matchesSerial;
-            });
+            const filteredDevices = useMemo(() => {
+                if (!devices) return [];
+                const term = serialSearch.toLowerCase();
+                return devices.filter(d => {
+                    const matchesMode = mode === 'borrow' ? d.status === 'Available' : d.status === 'Borrowed';
+                    const matchesSerial = (d.serial_number || '').toLowerCase().includes(term);
+                    return matchesMode && matchesSerial;
+                });
+            }, [devices, mode, serialSearch]);
 
             const handleAction = async (device) => {
                 if (mode === 'borrow' && !selectedStudent) {
-                    alert('โปรดเลือกนักเรียนก่อนดำเนินการ');
+                    alert('โปรดเลือกผู้ยืมก่อนดำเนินการ');
                     return;
                 }
 
                 setIsLoading(true);
                 const student = students.find(s => s.studentId === selectedStudent);
                 
+                // Calculate due date (14 days from now)
+                const now = new Date();
+                const dueDate = new Date();
+                dueDate.setDate(now.getDate() + 14);
+                const formatDate = (d) => {
+                    const y = d.getFullYear();
+                    const m = String(d.getMonth() + 1).padStart(2, '0');
+                    const day = String(d.getDate()).padStart(2, '0');
+                    return `${y}-${m}-${day}`;
+                };
+
                 const transactionData = {
-                    borrowerId: selectedStudent,
-                    fid: selectedStudent,
-                    fname: student?.fullName || '',
+                    borrowerId: 'TRX-' + Date.now(), // Auto-generated Transaction ID
+                    fid: selectedStudent, // Student/Borrower ID
+                    fname: student?.fullName || student?.fname || 'ไม่ระบุชื่อ',
                     serial_number: device.serial_number,
-                    borrowDate: mode === 'borrow' ? getADDate() : '',
-                    borrowTime: '', // Combined into borrowDate
-                    due_date: '', 
+                    borrowDate: mode === 'borrow' ? getADDate() : (transactions.find(t => t.serial_number === device.serial_number && t.status === 'Borrowed')?.borrowDate || ''),
+                    borrowTime: '', 
+                    due_date: mode === 'borrow' ? formatDate(dueDate) : '', 
                     return_date: mode === 'return' ? getADDate() : '',
                     emailId: borrowForm.email || 'ยังไม่ระบุ',
                     borrowNotes: borrowForm.notes || 'ยังไม่ระบุ',
@@ -1139,30 +1159,43 @@
                 };
 
                 try {
+                    // 1. บันทึก Transaction
                     const res = await gasHelper(mode === 'borrow' ? 'append' : 'update', 'Transactions', transactionData, currentUser);
-                    const devRes = await gasHelper('update', 'Devices', { serial_number: device.serial_number, status: mode === 'borrow' ? 'Borrowed' : 'Available' }, currentUser);
+                    
+                    // 2. อัปเดตสถานะ Device
+                    const devRes = await gasHelper('update', 'Devices', { 
+                        serial_number: device.serial_number, 
+                        status: mode === 'borrow' ? 'Borrowed' : 'Available' 
+                    }, currentUser);
 
                     if (res.success && devRes.success) {
                         alert(mode === 'borrow' ? 'บันทึกการยืมสำเร็จ' : 'บันทึกการคืนสำเร็จ');
+                        setSelectedStudent('');
+                        setSerialSearch('');
+                        setBorrowForm({ email: '', notes: '' });
                         onUpdate();
+                    } else {
+                        throw new Error(res.message || devRes.message || 'เกิดข้อผิดพลาดในการบันทึก');
                     }
                 } catch (err) {
                     alert('เกิดข้อผิดพลาด: ' + err.message);
+                } finally {
+                    setIsLoading(false);
                 }
-                setIsLoading(false);
             };
 
             return (
                 <div className="space-y-6">
                     <div className="flex justify-between items-center">
                         <h2 className="text-3xl font-bold text-spk-blue">ระบบ ยืม-คืน</h2>
-                        <div className="bg-white p-1 rounded-xl flex shadow-sm">
+                        <div className="bg-white p-1 rounded-xl flex shadow-sm border border-gray-100">
                             <button onClick={() => setMode('borrow')} className={`px-6 py-2 rounded-lg font-bold transition-all ${mode === 'borrow' ? 'bg-spk-blue text-white shadow-lg' : 'text-gray-400 hover:bg-gray-50'}`}>ยืมอุปกรณ์</button>
                             <button onClick={() => setMode('return')} className={`px-6 py-2 rounded-lg font-bold transition-all ${mode === 'return' ? 'bg-spk-blue text-white shadow-lg' : 'text-gray-400 hover:bg-gray-50'}`}>คืนอุปกรณ์</button>
                         </div>
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        {/* Left Column: Student Selection & Summary */}
                         <div className="lg:col-span-1 space-y-6">
                             {mode === 'borrow' && (
                                 <div className="card border-none shadow-xl bg-white">
@@ -1191,6 +1224,7 @@
                                                 <p className="text-[10px] text-gray-500 uppercase tracking-wider">{s.studentId || s.fid} • ม.{s.grade}/{s.classroom || s.room || '-'}</p>
                                             </button>
                                         ))}
+                                        {filteredStudents.length === 0 && <p className="text-center py-4 text-gray-400 text-xs">ไม่พบข้อมูล</p>}
                                     </div>
                                     {selectedStudent && (
                                         <div className="mt-4 space-y-3 pt-4 border-t border-gray-100">
@@ -1230,12 +1264,15 @@
                                             {mode === 'borrow' ? 'ยืมอุปกรณ์' : 'คืนอุปกรณ์'}
                                         </span>
                                     </div>
-                                    {mode === 'borrow' && (
-                                        <div className="flex justify-between items-start text-sm border-t border-white/10 pt-4">
-                                            <span className="opacity-70">ผู้ยืม</span>
-                                            <span className="font-bold text-right">{students.find(s => s.studentId === selectedStudent)?.fullName || 'ยังไม่ได้เลือก'}</span>
-                                        </div>
-                                    )}
+                                    <div className="flex justify-between items-start text-sm border-t border-white/10 pt-4">
+                                        <span className="opacity-70">ผู้ยืม</span>
+                                        <span className="font-bold text-right">
+                                            {mode === 'borrow' 
+                                                ? (students.find(s => s.studentId === selectedStudent)?.fullName || 'ยังไม่ได้เลือก')
+                                                : 'คืนตาม Serial Number'
+                                            }
+                                        </span>
+                                    </div>
                                     <div className="flex justify-between items-center text-sm border-t border-white/10 pt-4">
                                         <span className="opacity-70">เจ้าหน้าที่</span>
                                         <span className="font-bold">{currentUser.name}</span>
@@ -1244,6 +1281,7 @@
                             </div>
                         </div>
 
+                        {/* Right Column: Device Selection */}
                         <div className="lg:col-span-2 space-y-6">
                             <div className="card border-none shadow-xl bg-white p-6">
                                 <div className="flex flex-col sm:flex-row gap-4 justify-between items-center mb-6">
@@ -1273,9 +1311,9 @@
                                         <div key={d.serial_number} className="p-4 rounded-3xl border border-gray-100 bg-gray-50/50 hover:bg-white hover:shadow-lg transition-all group">
                                             <div className="flex justify-between items-start mb-4">
                                                 <div className="flex items-center gap-3">
-                                                    <div className="w-12 h-12 rounded-xl bg-white shadow-sm overflow-hidden flex items-center justify-center text-spk-blue shrink-0">
+                                                    <div className="w-12 h-12 rounded-xl bg-white shadow-sm overflow-hidden flex items-center justify-center text-spk-blue shrink-0 relative">
                                                         <img src={d.imageUrl || d.categoryImageUrl || ''} className="w-full h-full object-cover" onError={(e) => e.target.style.display='none'} />
-                                                        <Tablet size={20} className="absolute" />
+                                                        <Tablet size={20} className="absolute z-0 opacity-20" />
                                                     </div>
                                                     <div>
                                                         <h4 className="font-bold text-sm text-gray-800">{d.name}</h4>

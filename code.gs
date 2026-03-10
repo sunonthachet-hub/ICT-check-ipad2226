@@ -115,14 +115,28 @@ function updateData(sheetName, data, user) {
   const values = sheet.getDataRange().getDisplayValues();
   const headers = values[0];
   
-  // ค้นหาแถวที่จะอัปเดต (ใช้ serial_number หรือ id หรือ email หรือ fid)
-  const key = data.serial_number || data.id || data.email || data.fid || data.studentId;
+  // ค้นหาแถวที่จะอัปเดต
   let rowIndex = -1;
-  
-  for (let i = 1; i < values.length; i++) {
-    if (values[i].includes(key)) {
-      rowIndex = i + 1;
-      break;
+  const key = data.serial_number || data.id || data.email || data.fid || data.studentId || data.borrowerId;
+
+  // สำหรับ Transactions เราอาจต้องการหาแถวที่ serial_number ตรงกันและสถานะยังเป็น Borrowed
+  if (sheetName === 'Transactions' && data.status === 'Returned') {
+    const snIdx = headers.indexOf('serial_number');
+    const statusIdx = headers.indexOf('status');
+    for (let i = values.length - 1; i >= 1; i--) {
+      if (values[i][snIdx] === data.serial_number && values[i][statusIdx] === 'Borrowed') {
+        rowIndex = i + 1;
+        break;
+      }
+    }
+  }
+
+  if (rowIndex === -1) {
+    for (let i = 1; i < values.length; i++) {
+      if (values[i].includes(key)) {
+        rowIndex = i + 1;
+        break;
+      }
     }
   }
 
@@ -156,15 +170,61 @@ function deleteData(sheetName, data, user) {
 
 function importTransactions(data, user) {
   const sheet = SS.getSheetByName('Transactions');
+  const devSheet = SS.getSheetByName('Devices');
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
   
-  data.forEach(item => {
-    const row = headers.map(h => item[h] !== undefined ? item[h] : "");
-    sheet.appendRow(row);
+  const devValues = devSheet.getDataRange().getValues();
+  const devHeaders = devValues[0];
+  const devSerialIdx = devHeaders.indexOf('serial_number');
+  const devStatusIdx = devHeaders.indexOf('status');
+
+  let successCount = 0;
+  let failCount = 0;
+  let errors = [];
+
+  data.forEach((item, index) => {
+    try {
+      // 1. จัดการข้อมูลพื้นฐานและค่าเริ่มต้น
+      if (!item.borrowerId) {
+        item.borrowerId = 'TRX-' + Date.now() + '-' + index;
+      }
+      if (!item.emailId || item.emailId === "") item.emailId = "ยังไม่ระบุ";
+      if (!item.borrowNotes || item.borrowNotes === "") item.borrowNotes = "ยังไม่ระบุ";
+      
+      // คำนวณ due_date ถ้าไม่มี (บวก 14 วัน)
+      if (!item.due_date && item.borrowDate) {
+        const bDate = new Date(item.borrowDate);
+        if (!isNaN(bDate.getTime())) {
+          bDate.setDate(bDate.getDate() + 14);
+          item.due_date = Utilities.formatDate(bDate, Session.getScriptTimeZone(), "yyyy-MM-dd");
+        }
+      }
+
+      // 2. บันทึกลง Transactions
+      const row = headers.map(h => item[h] !== undefined ? item[h] : "");
+      sheet.appendRow(row);
+
+      // 3. อัปเดตสถานะใน Devices
+      if (item.serial_number && item.status) {
+        let found = false;
+        for (let i = 1; i < devValues.length; i++) {
+          if (devValues[i][devSerialIdx] === item.serial_number) {
+            const newStatus = item.status === 'Borrowed' ? 'Borrowed' : 'Available';
+            devSheet.getRange(i + 1, devStatusIdx + 1).setValue(newStatus);
+            found = true;
+            break;
+          }
+        }
+      }
+      successCount++;
+    } catch (e) {
+      failCount++;
+      errors.push(`Row ${index + 1}: ${e.message}`);
+    }
   });
   
-  logAction(user, 'IMPORT', 'Transactions', `Imported ${data.length} items`);
-  return { success: true, count: data.length };
+  logAction(user, 'IMPORT', 'Transactions', `Imported ${data.length} items and updated device statuses`);
+  return { success: true, successCount, failCount, errors };
 }
 
 function logAction(user, action, target, details) {
