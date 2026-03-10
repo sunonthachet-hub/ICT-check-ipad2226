@@ -199,6 +199,36 @@
         };
 
         // --- Service ---
+        // --- Date Helpers ---
+        const getADDate = () => {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+        };
+
+        const formatToBE = (dateStr) => {
+            if (!dateStr || dateStr === 'ยังไม่ระบุ' || dateStr === '1899-12-30T01:46:22.000Z') return 'ยังไม่ระบุ';
+            try {
+                const date = new Date(dateStr);
+                if (isNaN(date.getTime())) return dateStr;
+                
+                const beYear = date.getFullYear() + 543;
+                const day = String(date.getDate()).padStart(2, '0');
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const hours = String(date.getHours()).padStart(2, '0');
+                const minutes = String(date.getMinutes()).padStart(2, '0');
+                
+                return `${day}/${month}/${beYear} ${hours}:${minutes}`;
+            } catch (e) {
+                return dateStr;
+            }
+        };
+
         const gasHelper = async (action, sheetName, data, currentUser = null) => {
             if (!GAS_URL || GAS_URL.includes('XXXXXXXXX')) {
                 if (action === 'login') return { success: true, user: { id: '1', users: 'admin', role: 'Admin', name: 'Admin User' } };
@@ -572,7 +602,7 @@
                                             <div>
                                                 <p className="text-sm font-bold text-gray-800">{t.fname || 'ไม่ระบุชื่อ'}</p>
                                                 <p className="text-xs text-gray-500 mb-1">{t.status === 'Borrowed' ? 'ยืม' : 'คืน'}เครื่อง {t.serial_number}</p>
-                                                <p className="text-[10px] text-gray-400">{t.borrowDate || t.borrow_date} {t.borrowTime}</p>
+                                                <p className="text-[10px] text-gray-400">{formatToBE(t.borrowDate || t.borrow_date)}</p>
                                             </div>
                                         </div>
                                     ))}
@@ -1076,10 +1106,10 @@
                     fid: selectedStudent,
                     fname: student?.fullName || '',
                     serial_number: device.serial_number,
-                    borrowDate: mode === 'borrow' ? new Date().toLocaleDateString('th-TH') : '',
-                    borrowTime: mode === 'borrow' ? new Date().toLocaleTimeString('th-TH') : '',
-                    due_date: '', // Will be handled by backend or calculated here
-                    return_date: mode === 'return' ? new Date().toLocaleDateString('th-TH') : '',
+                    borrowDate: mode === 'borrow' ? getADDate() : '',
+                    borrowTime: '', // Combined into borrowDate
+                    due_date: '', 
+                    return_date: mode === 'return' ? getADDate() : '',
                     emailId: borrowForm.email || 'ยังไม่ระบุ',
                     borrowNotes: borrowForm.notes || 'ยังไม่ระบุ',
                     defaultAccessories: 'ยังไม่ระบุ',
@@ -1630,18 +1660,26 @@
                         const deviceTransactions = trans
                             .filter(t => t.serial_number === d.serial_number)
                             .sort((a, b) => {
-                                const dateA = new Date(`${a.borrowDate || a.borrow_date} ${a.borrowTime || '00:00'}`);
-                                const dateB = new Date(`${b.borrowDate || b.borrow_date} ${b.borrowTime || '00:00'}`);
-                                return dateB - dateA;
+                                const parseDate = (dateStr) => {
+                                    if (!dateStr || dateStr === 'ยังไม่ระบุ' || dateStr === '1899-12-30T01:46:22.000Z') return new Date(0);
+                                    try {
+                                        const d = new Date(dateStr);
+                                        return isNaN(d.getTime()) ? new Date(0) : d;
+                                    } catch (e) {
+                                        return new Date(0);
+                                    }
+                                };
+                                return parseDate(b.borrowDate || b.borrow_date) - parseDate(a.borrowDate || a.borrow_date);
                             });
                         
                         const latestTrans = deviceTransactions[0];
                         let currentStatus = d.status;
                         
                         if (latestTrans) {
-                            if (latestTrans.status === 'Borrowed') {
+                            const tStatus = (latestTrans.status || '').toLowerCase();
+                            if (tStatus === 'borrowed' || tStatus === 'active') {
                                 currentStatus = 'Borrowed';
-                            } else if (latestTrans.status === 'Returned' || latestTrans.status === 'Available') {
+                            } else if (tStatus === 'returned' || tStatus === 'available') {
                                 currentStatus = 'Available';
                             }
                         }
