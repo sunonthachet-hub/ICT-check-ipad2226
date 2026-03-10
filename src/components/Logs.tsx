@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ActivityLog, TranslationKey } from '../types';
 import { gasHelper } from '../services/gasService';
 import { History, Search, Filter, Calendar, User as UserIcon, Tag, Info, Loader2 } from 'lucide-react';
+import { formatThaiDate } from '../constants';
 
 interface LogsProps {
   t: (key: TranslationKey) => string;
@@ -110,7 +111,7 @@ const Logs: React.FC<LogsProps> = ({ t }) => {
                 {filteredLogs.map((log, index) => (
                   <tr key={index} className="hover:bg-gray-50/50 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-600">
-                      {log.timestamp}
+                      {formatThaiDate(log.timestamp, true)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-2">

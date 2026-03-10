@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Device, Category, DeviceStatus, TranslationKey, User, Student, Teacher, MaintenanceRecord, ServiceReport } from '../types';
+import { Device, Category, DeviceStatus, TranslationKey, User, Student, Teacher, MaintenanceRecord, ServiceReport, UserRole } from '../types';
 import { Plus, Edit2, Trash2, Package, Tag, Users, X, Settings } from 'lucide-react';
 import { gasHelper } from '../services/gasService';
+import { formatThaiDate } from '../constants';
 
 interface AdminPanelProps {
   devices: Device[] & {
@@ -23,10 +24,16 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ devices, categories, onUpdate, 
   const [studentGradeFilter, setStudentGradeFilter] = useState<string>('all');
   const [studentSearchTerm, setStudentSearchTerm] = useState<string>('');
 
-  const handleDelete = async (type: 'Devices' | 'Categories' | 'Users' | 'Students' | 'Service', id: string) => {
+  const handleDelete = async (type: string, id: string, item?: any) => {
     if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการลบรายการนี้?')) return;
     
-    const result = await gasHelper('delete', type, { id });
+    let sheetName = type;
+    if (type === 'Students' && item) {
+      if (item.grade === 'ม.5') sheetName = 'StudentsM5';
+      else if (item.grade === 'ม.6') sheetName = 'StudentsM6';
+    }
+
+    const result = await gasHelper('delete', sheetName, { id });
     if (result.success) {
       alert('ลบข้อมูลสำเร็จ');
       onUpdate();
@@ -206,7 +213,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ devices, categories, onUpdate, 
                     <p className="text-[10px] text-gray-400 font-mono uppercase tracking-wider">Product ID: {m.product_id}</p>
                   </td>
                   <td className="px-6 py-4">
-                    <p className="text-xs text-gray-500">Date: <span className="font-medium">{m.report_date}</span></p>
+                    <p className="text-xs text-gray-500">Date: <span className="font-medium">{formatThaiDate(m.report_date)}</span></p>
                   </td>
                   <td className="px-6 py-4">
                     <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${m.status === 'Completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
@@ -216,7 +223,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ devices, categories, onUpdate, 
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button onClick={() => { setEditingItem(m); setIsModalOpen(true); }} className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg cursor-pointer"><Edit2 className="w-4 h-4" /></button>
-                      <button onClick={() => handleDelete('Maintenance' as unknown as 'Devices', m.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg cursor-pointer"><Trash2 className="w-4 h-4" /></button>
+                      <button onClick={() => handleDelete('Maintenance', m.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg cursor-pointer"><Trash2 className="w-4 h-4" /></button>
                     </div>
                   </td>
                 </tr>
@@ -260,7 +267,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ devices, categories, onUpdate, 
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button onClick={() => { setEditingItem(student as any); setIsModalOpen(true); }} className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg cursor-pointer"><Edit2 className="w-4 h-4" /></button>
-                      <button onClick={() => handleDelete('Students', student.studentId)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg cursor-pointer"><Trash2 className="w-4 h-4" /></button>
+                      <button onClick={() => handleDelete('Students', student.studentId, student)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg cursor-pointer"><Trash2 className="w-4 h-4" /></button>
                     </div>
                   </td>
                 </tr>
@@ -273,7 +280,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ devices, categories, onUpdate, 
                   </td>
                   <td className="px-6 py-4">
                     <p className="text-xs text-gray-400 truncate max-w-xs">{report.details}</p>
-                    <p className="text-[10px] text-gray-400 mt-1">{report.reportedAt}</p>
+                    <p className="text-[10px] text-gray-400 mt-1">{formatThaiDate(report.reportedAt, true)}</p>
                   </td>
                   <td className="px-6 py-4">
                     <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${
@@ -306,11 +313,190 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ devices, categories, onUpdate, 
               <button onClick={() => setIsModalOpen(false)} className="text-white/70 hover:text-white cursor-pointer"><X className="w-6 h-6" /></button>
             </div>
             <div className="p-8">
-              <p className="text-gray-500 text-center py-12">แบบฟอร์มจัดการข้อมูล (กำลังพัฒนา...)</p>
-              <div className="flex gap-4 mt-6">
-                <button onClick={() => setIsModalOpen(false)} className="flex-grow py-3 border border-gray-200 rounded-xl font-bold text-gray-400 hover:bg-gray-50 cursor-pointer">ยกเลิก</button>
-                <button onClick={() => setIsModalOpen(false)} className="flex-grow py-3 bg-spk-blue text-white rounded-xl font-bold shadow-lg cursor-pointer">บันทึกข้อมูล</button>
-              </div>
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.currentTarget);
+                const data: any = Object.fromEntries(formData.entries());
+                
+                // Add ID if it's a new item and needs one
+                if (!editingItem) {
+                  if (activeSubTab === 'inventory') data.id = 'DEV-' + Date.now();
+                  if (activeSubTab === 'categories') data.id = 'CAT-' + Date.now();
+                  if (activeSubTab === 'users') data.id = 'USR-' + Date.now();
+                  if (activeSubTab === 'maintenance') data.id = 'MNT-' + Date.now();
+                } else {
+                  data.id = (editingItem as any).id || (editingItem as any).studentId;
+                  if (activeSubTab === 'students') data.studentId = (editingItem as any).studentId;
+                }
+
+                const action = editingItem ? 'update' : 'append';
+                let sheetName = 
+                  activeSubTab === 'inventory' ? 'Devices' : 
+                  activeSubTab === 'categories' ? 'Categories' : 
+                  activeSubTab === 'users' ? 'Users' : 
+                  activeSubTab === 'students' ? 'Students' : 
+                  activeSubTab === 'maintenance' ? 'Maintenance' : 'Service';
+
+                // Special handling for students split across sheets
+                if (activeSubTab === 'students') {
+                  if (data.grade === 'ม.5') sheetName = 'StudentsM5';
+                  else if (data.grade === 'ม.6') sheetName = 'StudentsM6';
+                  else sheetName = 'Students';
+                }
+
+                const result = await gasHelper(action, sheetName, data);
+                if (result.success) {
+                  alert('บันทึกข้อมูลสำเร็จ');
+                  setIsModalOpen(false);
+                  onUpdate();
+                } else {
+                  alert('เกิดข้อผิดพลาด: ' + result.error);
+                }
+              }} className="space-y-4">
+                {activeSubTab === 'inventory' && (
+                  <>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1">หมวดหมู่</label>
+                      <select name="category_id" defaultValue={(editingItem as Device)?.category_id} className="input-field" required>
+                        {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Serial Number</label>
+                      <input name="serial_number" defaultValue={(editingItem as Device)?.serial_number} className="input-field" required />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1">อุปกรณ์เสริมพื้นฐาน</label>
+                      <input name="defaultAccessories" defaultValue={(editingItem as Device)?.defaultAccessories} className="input-field" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1">สถานะ</label>
+                      <select name="status" defaultValue={(editingItem as Device)?.status || DeviceStatus.Available} className="input-field">
+                        {Object.values(DeviceStatus).map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+                  </>
+                )}
+
+                {activeSubTab === 'categories' && (
+                  <>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1">ชื่อหมวดหมู่</label>
+                      <input name="name" defaultValue={(editingItem as Category)?.name} className="input-field" required />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1">คำอธิบาย</label>
+                      <input name="description" defaultValue={(editingItem as Category)?.description} className="input-field" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1">สิทธิ์การยืม</label>
+                      <select name="designatedFor" defaultValue={(editingItem as Category)?.designatedFor || UserRole.Student} className="input-field">
+                        {Object.values(UserRole).map(r => <option key={r} value={r}>{r}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1">URL รูปภาพ</label>
+                      <input name="imageUrl" defaultValue={(editingItem as Category)?.imageUrl} className="input-field" placeholder="https://..." />
+                    </div>
+                  </>
+                )}
+
+                {activeSubTab === 'users' && (
+                  <>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1">ชื่อผู้ใช้ (Login)</label>
+                      <input name="users" defaultValue={(editingItem as User)?.users} className="input-field" required />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1">รหัสผ่าน</label>
+                      <input name="password" type="password" className="input-field" required={!editingItem} />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1">บทบาท</label>
+                      <select name="role" defaultValue={(editingItem as User)?.role || UserRole.Student} className="input-field">
+                        {Object.values(UserRole).map(r => <option key={r} value={r}>{r}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1">ชื่อ-นามสกุล</label>
+                      <input name="fullName" defaultValue={(editingItem as User)?.fullName} className="input-field" />
+                    </div>
+                  </>
+                )}
+
+                {activeSubTab === 'students' && (
+                  <>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1">รหัสนักเรียน</label>
+                      <input name="studentId" defaultValue={(editingItem as Student)?.studentId} className="input-field" required disabled={!!editingItem} />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1">ชื่อ-นามสกุล</label>
+                      <input name="fullName" defaultValue={(editingItem as Student)?.fullName} className="input-field" required />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1">ระดับชั้น</label>
+                      <select name="grade" defaultValue={(editingItem as Student)?.grade || 'ม.4'} className="input-field">
+                        <option value="ม.4">ม.4</option>
+                        <option value="ม.5">ม.5</option>
+                        <option value="ม.6">ม.6</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1">ห้อง</label>
+                      <input name="classroom" defaultValue={(editingItem as Student)?.classroom} className="input-field" placeholder="เช่น 1, 2, 3" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1">อีเมล</label>
+                      <input name="email" type="email" defaultValue={(editingItem as Student)?.email} className="input-field" />
+                    </div>
+                  </>
+                )}
+
+                {activeSubTab === 'maintenance' && (
+                  <>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1">รหัสครุภัณฑ์</label>
+                      <input name="product_id" defaultValue={(editingItem as MaintenanceRecord)?.product_id} className="input-field" required />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1">อาการเสีย/ปัญหา</label>
+                      <textarea name="issue" defaultValue={(editingItem as MaintenanceRecord)?.issue} className="input-field min-h-[100px]" required />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1">วันที่แจ้ง</label>
+                      <input name="report_date" type="date" defaultValue={(editingItem as MaintenanceRecord)?.report_date || new Date().toISOString().split('T')[0]} className="input-field" required />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1">สถานะ</label>
+                      <select name="status" defaultValue={(editingItem as MaintenanceRecord)?.status || 'Pending'} className="input-field">
+                        <option value="Pending">รอดำเนินการ</option>
+                        <option value="In Progress">กำลังซ่อม</option>
+                        <option value="Completed">เสร็จสิ้น</option>
+                      </select>
+                    </div>
+                  </>
+                )}
+
+                {activeSubTab === 'service' && (
+                  <>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1">สถานะการแจ้งซ่อม</label>
+                      <select name="status" defaultValue={(editingItem as ServiceReport)?.status || 'Pending'} className="input-field">
+                        <option value="Pending">รอดำเนินการ</option>
+                        <option value="In Progress">กำลังดำเนินการ</option>
+                        <option value="Resolved">แก้ไขแล้ว</option>
+                      </select>
+                    </div>
+                    <p className="text-[10px] text-gray-400 italic mt-2">* ข้อมูลอื่นๆ ของการแจ้งซ่อมไม่สามารถแก้ไขได้จากหน้านี้</p>
+                  </>
+                )}
+
+                <div className="flex gap-4 mt-8">
+                  <button type="button" onClick={() => setIsModalOpen(false)} className="flex-grow py-3 border border-gray-200 rounded-xl font-bold text-gray-400 hover:bg-gray-50 cursor-pointer transition-colors">ยกเลิก</button>
+                  <button type="submit" className="flex-grow py-3 bg-spk-blue text-white rounded-xl font-bold shadow-lg hover:bg-blue-900 cursor-pointer transition-all active:scale-95">บันทึกข้อมูล</button>
+                </div>
+              </form>
             </div>
           </div>
         </div>

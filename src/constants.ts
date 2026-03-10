@@ -48,3 +48,27 @@ export const translations = {
     studentsRegistry: 'Students Registry',
   }
 };
+
+export const formatThaiDate = (dateStr: string | undefined, includeTime: boolean = false) => {
+  if (!dateStr) return '-';
+  // Handle yyyy-MM-dd or ISO strings
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return dateStr;
+  
+  const months = [
+    'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+    'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
+  ];
+  
+  const day = date.getDate();
+  const month = months[date.getMonth()];
+  const year = date.getFullYear();
+  
+  let result = `${day} ${month} ${year}`;
+  if (includeTime) {
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    result += ` ${hours}:${minutes}`;
+  }
+  return result;
+};

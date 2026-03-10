@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Device, Category, DeviceStatus, TranslationKey } from '../types';
 import { Search, Filter, Package, Tag, Info, User, Calendar, QrCode } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { formatThaiDate } from '../constants';
 
 interface InventoryProps {
   devices: Device[];
@@ -167,7 +168,7 @@ const Inventory: React.FC<InventoryProps> = ({ devices, t }) => {
                           <span>วันที่ยืม</span>
                         </div>
                         {/* @ts-ignore */}
-                        <span className="text-xs font-medium text-gray-600">{new Date(device.borrowDate).toLocaleDateString('th-TH')}</span>
+                        <span className="text-xs font-medium text-gray-600">{formatThaiDate(device.borrowDate)}</span>
                       </div>
                     )}
                   </div>

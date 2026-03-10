@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import { Device, User, DeviceStatus, TranslationKey } from '../types';
-import { Search, RefreshCw, ArrowRightLeft, QrCode, CheckCircle, Camera, X } from 'lucide-react';
+import { Search, RefreshCw, ArrowRightLeft, CheckCircle, Info as InfoIcon, QrCode } from 'lucide-react';
 import { gasHelper } from '../services/gasService';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Html5QrcodeScanner } from 'html5-qrcode';
+import { motion } from 'framer-motion';
+import { formatThaiDate } from '../constants';
 
 interface BorrowReturnProps {
   devices: Device[];
@@ -17,47 +17,6 @@ const BorrowReturn: React.FC<BorrowReturnProps> = ({ devices, currentUser, onUpd
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
-  const [isScannerOpen, setIsScannerOpen] = useState(false);
-  const scannerRef = useRef<Html5QrcodeScanner | null>(null);
-
-  useEffect(() => {
-    let scanner: Html5QrcodeScanner | null = null;
-
-    if (isScannerOpen) {
-      // Small delay to ensure the DOM element #reader is mounted and ready
-      const timer = setTimeout(() => {
-        try {
-          const element = document.getElementById("reader");
-          if (element) {
-            scanner = new Html5QrcodeScanner(
-              "reader",
-              { fps: 10, qrbox: { width: 250, height: 250 } },
-              /* verbose= */ false
-            );
-            
-            scanner.render((decodedText) => {
-              setSearchTerm(decodedText);
-              setIsScannerOpen(false);
-            }, () => {
-              // Ignore errors during scanning
-            });
-
-            scannerRef.current = scanner;
-          }
-        } catch (err) {
-          console.error("Scanner initialization failed", err);
-        }
-      }, 300);
-
-      return () => {
-        clearTimeout(timer);
-        if (scanner) {
-          scanner.clear().catch(err => console.warn("Failed to clear scanner", err));
-          scannerRef.current = null;
-        }
-      };
-    }
-  }, [isScannerOpen]);
 
   const filteredDevices = devices.filter(d => {
     const matchesSearch = 
@@ -147,24 +106,15 @@ const BorrowReturn: React.FC<BorrowReturnProps> = ({ devices, currentUser, onUpd
         {/* Search & Selection */}
         <div className="lg:col-span-2 space-y-6">
           <div className="card">
-            <div className="flex gap-2">
-              <div className="relative flex-grow">
-                <input
-                  type="text"
-                  placeholder={mode === 'borrow' ? "ค้นหาอุปกรณ์ที่ว่าง..." : "ค้นหาอุปกรณ์ที่ถูกยืม..."}
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="input-field pl-12"
-                />
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-              </div>
-              <button 
-                disabled
-                className="bg-gray-200 text-gray-400 p-4 rounded-xl flex items-center justify-center cursor-not-allowed"
-                title="ระบบกำลังพัฒนา"
-              >
-                <Camera className="w-6 h-6" />
-              </button>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder={mode === 'borrow' ? "กรอกรหัสอุปกรณ์ หรือ ค้นหา..." : "กรอกรหัสอุปกรณ์ หรือ ค้นหา..."}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="input-field pl-12"
+              />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
             </div>
           </div>
 
@@ -207,7 +157,7 @@ const BorrowReturn: React.FC<BorrowReturnProps> = ({ devices, currentUser, onUpd
         <div className="space-y-6">
           <div className="card sticky top-24">
             <h3 className="text-lg font-bold text-spk-blue mb-6 flex items-center gap-2">
-              <Info className="w-5 h-5" />
+              <InfoIcon className="w-5 h-5" />
               รายละเอียดการทำรายการ
             </h3>
 
@@ -228,7 +178,7 @@ const BorrowReturn: React.FC<BorrowReturnProps> = ({ devices, currentUser, onUpd
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-500">วันที่ทำรายการ</span>
-                    <span className="font-bold">{new Date().toLocaleDateString('th-TH')}</span>
+                    <span className="font-bold">{formatThaiDate(new Date().toISOString())}</span>
                   </div>
                   {/* @ts-ignore */}
                   {mode === 'return' && selectedDevice.borrowedBy && (
@@ -273,39 +223,6 @@ const BorrowReturn: React.FC<BorrowReturnProps> = ({ devices, currentUser, onUpd
           </div>
         </div>
       </div>
-
-      {/* Scanner Modal */}
-      <AnimatePresence>
-        {isScannerOpen && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className="bg-white rounded-3xl overflow-hidden w-full max-w-md shadow-2xl"
-            >
-              <div className="bg-spk-blue p-6 text-white flex justify-between items-center">
-                <div className="flex items-center gap-3">
-                  <Camera className="w-6 h-6" />
-                  <h3 className="font-bold text-lg">แสกน QR / บาร์โค้ด</h3>
-                </div>
-                <button 
-                  onClick={() => setIsScannerOpen(false)}
-                  className="p-2 hover:bg-white/10 rounded-full transition-colors cursor-pointer"
-                >
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
-              <div className="p-6">
-                <div id="reader" className="w-full overflow-hidden rounded-2xl border-2 border-dashed border-gray-200"></div>
-                <p className="text-center text-gray-400 text-sm mt-6 font-medium">
-                  วางรหัส QR หรือ บาร์โค้ด ให้อยู่ในกรอบเพื่อแสกน
-                </p>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
     </div>
   );
 };

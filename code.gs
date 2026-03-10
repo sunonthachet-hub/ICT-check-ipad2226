@@ -216,7 +216,7 @@ function importTransactions(data, user) {
           } else {
             bDate.setDate(bDate.getDate() + 14);
           }
-          item.due_date = Utilities.formatDate(bDate, Session.getScriptTimeZone(), "yyyy-MM-dd");
+          item.due_date = Utilities.formatDate(bDate, "GMT+7", "yyyy-MM-dd");
         }
       }
 
@@ -256,8 +256,9 @@ function borrowDevice(data, user) {
 
   // 1. Calculate Dates
   const now = new Date();
-  const borrowDate = Utilities.formatDate(now, Session.getScriptTimeZone(), "yyyy-MM-dd");
-  const borrowTime = Utilities.formatDate(now, Session.getScriptTimeZone(), "HH:mm:ss");
+  const timezone = "GMT+7";
+  const borrowDate = Utilities.formatDate(now, timezone, "yyyy-MM-dd");
+  const borrowTime = Utilities.formatDate(now, timezone, "HH:mm:ss");
   
   let dueDate = new Date(now);
   if (data.userRole === 'Student') {
