@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Device, Category, DeviceStatus, TranslationKey } from '../types';
-import { Search, Filter, Package, Tag, Info, User, Calendar, QrCode } from 'lucide-react';
+import { Search, Filter, Package, Tag, Info, User, Calendar, Hash } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatThaiDate } from '../constants';
 
@@ -135,7 +135,7 @@ const Inventory: React.FC<InventoryProps> = ({ devices, t }) => {
                 <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-50">
                   <div className="space-y-1">
                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1">
-                      <QrCode className="w-3 h-3" />
+                      <Hash className="w-3 h-3" />
                       Asset ID
                     </p>
                     <p className="text-sm font-mono font-bold text-spk-blue">{device.id}</p>

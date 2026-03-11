@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { RefreshCw, Tablet, Smartphone, LogIn, AlertTriangle, Package, FileText, Phone, Facebook, MapPin, Send, Camera, CheckCircle2, QrCode, X } from 'lucide-react';
+import { RefreshCw, Tablet, Smartphone, LogIn, AlertTriangle, Package, FileText, Phone, Facebook, MapPin, Send, Camera, CheckCircle2 } from 'lucide-react';
 import { Category, Device } from '../types';
 import { gasHelper } from '../services/gasService';
-import { Html5QrcodeScanner } from 'html5-qrcode';
 
 interface LandingPageProps {
   onStart: () => void;
@@ -19,46 +18,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart, onAdminLogin, dbConn
   const [activeSection, setActiveSection] = useState<Section>('home');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
-  const [isScannerOpen, setIsScannerOpen] = useState(false);
-  const scannerRef = useRef<Html5QrcodeScanner | null>(null);
   const [reportForm, setReportForm] = useState({
     device_id: '',
     issue_type: '',
     details: '',
   });
-
-  useEffect(() => {
-    if (isScannerOpen) {
-      const scanner = new Html5QrcodeScanner(
-        "landing-reader",
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        /* verbose= */ false
-      );
-      
-      scanner.render((decodedText) => {
-        // Try to find device by serial or ID
-        const device = devices.find(d => 
-          d.serial_number === decodedText || 
-          d.id.toString() === decodedText
-        );
-        if (device) {
-          setReportForm(prev => ({ ...prev, device_id: device.id }));
-          setIsScannerOpen(false);
-          scanner.clear();
-        } else {
-          alert('ไม่พบอุปกรณ์ที่แสกน: ' + decodedText);
-        }
-      }, () => {});
-
-      scannerRef.current = scanner;
-    }
-
-    return () => {
-      if (scannerRef.current) {
-        scannerRef.current.clear().catch(err => console.error("Failed to clear scanner", err));
-      }
-    };
-  }, [isScannerOpen, devices]);
 
   const navItems = [
     { label: 'หน้าแรก', id: 'home' as Section },
@@ -217,21 +181,13 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart, onAdminLogin, dbConn
                         <select 
                           value={reportForm.device_id}
                           onChange={(e) => setReportForm({...reportForm, device_id: e.target.value})}
-                          className="flex-grow bg-slate-900 border border-white/10 rounded-xl px-5 py-4 text-white focus:border-spk-yellow outline-none transition-all appearance-none cursor-pointer"
+                          className="w-full bg-slate-900 border border-white/10 rounded-xl px-5 py-4 text-white focus:border-spk-yellow outline-none transition-all appearance-none cursor-pointer"
                         >
                           <option value="">-- เลือกอุปกรณ์ --</option>
                           {devices.map(d => (
                             <option key={d.id} value={d.id}>{d.name} ({d.serial_number})</option>
                           ))}
                         </select>
-                        <button 
-                          type="button"
-                          onClick={() => setIsScannerOpen(true)}
-                          className="bg-spk-blue text-white p-4 rounded-xl hover:bg-blue-900 transition-all flex items-center justify-center cursor-pointer"
-                          title="แสกน QR"
-                        >
-                          <QrCode className="w-6 h-6" />
-                        </button>
                       </div>
                     </div>
                     <div className="space-y-3">
@@ -556,39 +512,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart, onAdminLogin, dbConn
           </div>
         </div>
       </footer>
-
-      {/* Scanner Modal */}
-      <AnimatePresence>
-        {isScannerOpen && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className="bg-slate-900 rounded-3xl overflow-hidden w-full max-w-md shadow-2xl border border-white/10"
-            >
-              <div className="bg-spk-blue p-6 text-white flex justify-between items-center">
-                <div className="flex items-center gap-3">
-                  <Camera className="w-6 h-6" />
-                  <h3 className="font-bold text-lg text-white">แสกน QR / บาร์โค้ด</h3>
-                </div>
-                <button 
-                  onClick={() => setIsScannerOpen(false)}
-                  className="p-2 hover:bg-white/10 rounded-full transition-colors cursor-pointer"
-                >
-                  <X className="w-6 h-6 text-white" />
-                </button>
-              </div>
-              <div className="p-6">
-                <div id="landing-reader" className="w-full overflow-hidden rounded-2xl border-2 border-dashed border-white/10"></div>
-                <p className="text-center text-slate-400 text-sm mt-6 font-medium">
-                  วางรหัส QR หรือ บาร์โค้ด ให้อยู่ในกรอบเพื่อแสกนอุปกรณ์
-                </p>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
 
       {/* Footer Decoration */}
       <div className="fixed bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-spk-blue via-spk-yellow to-spk-blue opacity-30"></div>

@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Device, User, DeviceStatus, TranslationKey, Student } from '../types';
-import { Search, RefreshCw, ArrowRightLeft, CheckCircle, Info as InfoIcon, QrCode, User as UserIcon, Laptop, CheckSquare, Square } from 'lucide-react';
+import { Search, RefreshCw, ArrowRightLeft, CheckCircle, Info as InfoIcon, Hash, User as UserIcon, Laptop, CheckSquare, Square } from 'lucide-react';
 import { gasHelper } from '../services/gasService';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatThaiDate } from '../constants';
@@ -476,7 +476,7 @@ const BorrowReturn: React.FC<BorrowReturnProps> = ({ devices, currentUser, onUpd
             {filteredDevices.length === 0 && deviceSearch && (
               <div className="col-span-full py-20 text-center space-y-4">
                 <div className="w-20 h-20 bg-spk-gray rounded-full flex items-center justify-center mx-auto text-gray-300">
-                  <QrCode className="w-10 h-10" />
+                  <Search className="w-10 h-10" />
                 </div>
                 <p className="text-gray-400 font-bold">ไม่พบอุปกรณ์ที่ถูกยืมที่ตรงกับการค้นหา</p>
               </div>
