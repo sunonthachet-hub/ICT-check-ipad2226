@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Device, Category, DeviceStatus, TranslationKey, User, Student, Teacher, ServiceLog, ServiceReport, UserRole } from '../types';
-import { Plus, Edit2, Trash2, Package, Tag, Users, X, Settings, GraduationCap, User as UserIcon } from 'lucide-react';
+import { Plus, Edit2, Trash2, Package, Tag, Users, X, Settings, GraduationCap, User as UserIcon, RefreshCw } from 'lucide-react';
 import { gasHelper } from '../services/gasService';
 import { formatThaiDate } from '../constants';
 
@@ -52,6 +52,13 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ devices, categories, onUpdate, 
         </div>
         
         <div className="flex bg-white p-1 rounded-xl shadow-sm border border-gray-100">
+          <button
+            onClick={onUpdate}
+            className="px-4 py-2 rounded-lg text-sm font-bold text-spk-blue hover:bg-spk-gray transition-all flex items-center gap-2 cursor-pointer"
+            title="รีเฟรชข้อมูลจาก Google Sheets"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
           <button
             onClick={() => setActiveSubTab('inventory')}
             className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${activeSubTab === 'inventory' ? 'bg-spk-blue text-white shadow-md' : 'text-gray-400 hover:text-gray-600 cursor-pointer'}`}
@@ -304,6 +311,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ devices, categories, onUpdate, 
                   </td>
                   <td className="px-6 py-4">
                     <p className="text-xs text-gray-500">ชั้น: <span className="font-medium">{student.grade}/{student.classroom}</span></p>
+                    {student.teacherId && (
+                      <p className="text-[10px] text-spk-blue font-bold">
+                        ครู: {devices.teachers?.find(t => t.id === student.teacherId)?.fullName || student.teacherId}
+                      </p>
+                    )}
                   </td>
                   <td className="px-6 py-4">
                     <span className="text-xs text-gray-400">{student.email}</span>
@@ -513,22 +525,56 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ devices, categories, onUpdate, 
                       <label className="block text-xs font-bold text-gray-400 uppercase mb-1">ชื่อ-นามสกุล</label>
                       <input name="fullName" defaultValue={(editingItem as Student)?.fullName} className="input-field" required />
                     </div>
-                    <div>
-                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1">ระดับชั้น</label>
-                      <select name="grade" defaultValue={(editingItem as Student)?.grade || 'ม.4'} className="input-field">
-                        <option value="ม.4">ม.4</option>
-                        <option value="ม.5">ม.5</option>
-                        <option value="ม.6">ม.6</option>
-                      </select>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-400 uppercase mb-1">ระดับชั้น</label>
+                        <select name="grade" defaultValue={(editingItem as Student)?.grade || 'ม.4'} className="input-field">
+                          <option value="ม.4">ม.4</option>
+                          <option value="ม.5">ม.5</option>
+                          <option value="ม.6">ม.6</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-400 uppercase mb-1">ห้อง</label>
+                        <input name="classroom" defaultValue={(editingItem as Student)?.classroom} className="input-field" placeholder="เช่น 1, 2, 3" />
+                      </div>
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1">ห้อง</label>
-                      <input name="classroom" defaultValue={(editingItem as Student)?.classroom} className="input-field" placeholder="เช่น 1, 2, 3" />
+                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1">ครูประจำชั้น</label>
+                      <select name="teacherId" defaultValue={(editingItem as Student)?.teacherId} className="input-field">
+                        <option value="">-- เลือกครูประจำชั้น --</option>
+                        {devices.teachers?.map(t => (
+                          <option key={t.id} value={t.id}>{t.fullName} ({t.department})</option>
+                        ))}
+                      </select>
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-gray-400 uppercase mb-1">อีเมล</label>
                       <input name="email" type="email" defaultValue={(editingItem as Student)?.email} className="input-field" />
                     </div>
+
+                    {editingItem && (
+                      <div className="mt-4 p-4 bg-spk-gray rounded-xl border border-gray-100">
+                        <h5 className="text-xs font-bold text-spk-blue uppercase mb-2">ข้อมูลการยืมอุปกรณ์</h5>
+                        {(() => {
+                          const borrowed = devices.find(d => d.borrowedBy === (editingItem as Student).fullName);
+                          if (borrowed) {
+                            return (
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-lg bg-white overflow-hidden border border-gray-100">
+                                  <img src={borrowed.imageUrl || `https://picsum.photos/seed/${borrowed.id}/100`} alt="" className="w-full h-full object-cover" />
+                                </div>
+                                <div>
+                                  <p className="text-sm font-bold text-gray-800">{borrowed.name}</p>
+                                  <p className="text-[10px] text-gray-400 font-mono">S/N: {borrowed.serial_number}</p>
+                                </div>
+                              </div>
+                            );
+                          }
+                          return <p className="text-xs text-gray-400 italic">ไม่มีอุปกรณ์ที่ยืมอยู่ในขณะนี้</p>;
+                        })()}
+                      </div>
+                    )}
                   </>
                 )}
 

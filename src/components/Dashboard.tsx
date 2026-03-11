@@ -10,10 +10,11 @@ interface DashboardProps {
     borrowed: number;
     maintenance: number;
   };
+  onRefresh?: () => void;
   t: (key: TranslationKey) => string;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ stats, t }) => {
+const Dashboard: React.FC<DashboardProps> = ({ stats, onRefresh, t }) => {
   const statCards = [
     { label: t('total_devices'), value: stats.total, icon: Package, color: 'bg-spk-blue', textColor: 'text-white' },
     { label: t('available'), value: stats.available, icon: CheckCircle, color: 'bg-green-500', textColor: 'text-white' },
@@ -30,9 +31,19 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, t }) => {
           <h2 className="text-3xl font-bold text-spk-blue">{t('dashboard')}</h2>
           <p className="text-gray-500">ICT Inventory System Overview</p>
         </div>
-        <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl shadow-sm border border-gray-100">
-          <Clock className="w-4 h-4 text-gray-400" />
-          <span className="text-sm font-medium text-gray-600">{new Date().toLocaleDateString('th-TH', { dateStyle: 'long' })}</span>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={onRefresh}
+            className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl shadow-sm border border-gray-100 hover:bg-spk-gray transition-all text-spk-blue font-bold text-sm cursor-pointer"
+            title="รีเฟรชข้อมูล"
+          >
+            <RefreshCw className="w-4 h-4" />
+            รีเฟรช
+          </button>
+          <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl shadow-sm border border-gray-100">
+            <Clock className="w-4 h-4 text-gray-400" />
+            <span className="text-sm font-medium text-gray-600">{new Date().toLocaleDateString('th-TH', { dateStyle: 'long' })}</span>
+          </div>
         </div>
       </header>
 

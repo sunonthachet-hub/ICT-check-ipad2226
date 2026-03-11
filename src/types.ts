@@ -58,6 +58,7 @@ export interface Student {
   grade: string;
   classroom: string;
   email: string;
+  teacherId?: string;
   note?: string;
 }
 

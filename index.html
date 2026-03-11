@@ -1747,9 +1747,9 @@
                     
                     // Combine all student levels and add grade property
                     const allStudents = [
-                        ...(s4Res.success ? s4Res.data.map(s => ({ ...s, grade: '4', fullName: s.fullName || s.fname, studentId: s.studentId || s.fid })) : []),
-                        ...(s5Res.success ? s5Res.data.map(s => ({ ...s, grade: '5', fullName: s.fullName || s.fname, studentId: s.studentId || s.fid })) : []),
-                        ...(s6Res.success ? s6Res.data.map(s => ({ ...s, grade: '6', fullName: s.fullName || s.fname, studentId: s.studentId || s.fid })) : [])
+                        ...(s4Res.success ? s4Res.data.map(s => ({ ...s, grade: 'ม.4', fullName: s.fullName || s.fname, studentId: s.studentId || s.fid })) : []),
+                        ...(s5Res.success ? s5Res.data.map(s => ({ ...s, grade: 'ม.5', fullName: s.fullName || s.fname, studentId: s.studentId || s.fid })) : []),
+                        ...(s6Res.success ? s6Res.data.map(s => ({ ...s, grade: 'ม.6', fullName: s.fullName || s.fname, studentId: s.studentId || s.fid })) : [])
                     ];
                     setStudents(allStudents);
                     setStats({
@@ -1777,7 +1777,7 @@
 
             const renderContent = () => {
                 switch (activeTab) {
-                    case 'dashboard': return <Dashboard stats={stats} transactions={transactions} t={t} />;
+                    case 'dashboard': return <Dashboard stats={stats} onRefresh={loadData} transactions={transactions} t={t} />;
                     case 'inventory': return <Inventory devices={devices} categories={categories} transactions={transactions} currentUser={currentUser} onUpdate={loadData} t={t} />;
                     case 'borrow': return <BorrowReturn devices={devices} students={students} transactions={transactions} currentUser={currentUser} onUpdate={loadData} t={t} />;
                     case 'registry': return <Registry students={students} onUpdate={loadData} t={t} />;
