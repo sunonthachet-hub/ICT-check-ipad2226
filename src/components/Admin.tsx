@@ -167,11 +167,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ devices, categories, onUpdate, 
             </thead>
             <tbody className="divide-y divide-gray-50">
               {activeSubTab === 'inventory' && devices.map((device) => (
-                <tr key={device.id} className="hover:bg-spk-gray/30 transition-colors group">
+                <tr key={device.serial_number} className="hover:bg-spk-gray/30 transition-colors group">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-gray-100 overflow-hidden">
-                        <img src={device.imageUrl || `https://picsum.photos/seed/${device.id}/100`} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
+                        <Package className="w-6 h-6 text-gray-300" />
                       </div>
                       <div>
                         <p className="font-bold text-gray-800">{device.name}</p>
@@ -180,8 +180,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ devices, categories, onUpdate, 
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <p className="text-xs text-gray-500">ID: <span className="font-mono font-bold text-spk-blue">{device.id}</span></p>
                     <p className="text-xs text-gray-500">หมวดหมู่: <span className="font-medium">{device.categoryName}</span></p>
+                    {device.notes && <p className="text-[10px] text-gray-400 italic mt-1">Note: {device.notes}</p>}
                   </td>
                   <td className="px-6 py-4">
                     <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${device.status === DeviceStatus.Available ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
@@ -191,7 +191,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ devices, categories, onUpdate, 
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button onClick={() => { setEditingItem(device); setIsModalOpen(true); }} className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg cursor-pointer"><Edit2 className="w-4 h-4" /></button>
-                      <button onClick={() => handleDelete('Devices', device.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg cursor-pointer"><Trash2 className="w-4 h-4" /></button>
+                      <button onClick={() => handleDelete('Devices', device.serial_number)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg cursor-pointer"><Trash2 className="w-4 h-4" /></button>
                     </div>
                   </td>
                 </tr>
@@ -376,15 +376,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ devices, categories, onUpdate, 
                 
                 // Add ID if it's a new item and needs one
                 if (!editingItem) {
-                  if (activeSubTab === 'inventory') data.id = 'DEV-' + Date.now();
                   if (activeSubTab === 'categories') data.id = 'CAT-' + Date.now();
                   if (activeSubTab === 'users') data.id = 'USR-' + Date.now();
                   if (activeSubTab === 'serviceLogs') data.id = 'MNT-' + Date.now();
                   if (activeSubTab === 'teachers') data.id = 'TCH-' + Date.now();
                 } else {
-                  data.id = (editingItem as any).id || (editingItem as any).studentId || (editingItem as any).users;
+                  data.id = (editingItem as any).id || (editingItem as any).studentId || (editingItem as any).users || (editingItem as any).serial_number;
                   if (activeSubTab === 'students') data.studentId = (editingItem as any).studentId;
                   if (activeSubTab === 'users') data.users = (editingItem as any).users;
+                  if (activeSubTab === 'inventory') data.id = (editingItem as Device).serial_number;
                 }
 
                 const action = editingItem ? 'update' : 'append';
@@ -415,14 +415,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ devices, categories, onUpdate, 
                 {activeSubTab === 'inventory' && (
                   <>
                     <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Serial Number</label>
+                      <input name="serial_number" defaultValue={(editingItem as Device)?.serial_number} className="input-field" required disabled={!!editingItem} />
+                    </div>
+                    <div>
                       <label className="block text-xs font-bold text-gray-400 uppercase mb-1">หมวดหมู่</label>
                       <select name="category_id" defaultValue={(editingItem as Device)?.category_id} className="input-field" required>
                         {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                       </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Serial Number</label>
-                      <input name="serial_number" defaultValue={(editingItem as Device)?.serial_number} className="input-field" required />
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-gray-400 uppercase mb-1">อุปกรณ์เสริมพื้นฐาน</label>
@@ -433,6 +433,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ devices, categories, onUpdate, 
                       <select name="status" defaultValue={(editingItem as Device)?.status || DeviceStatus.Available} className="input-field">
                         {Object.values(DeviceStatus).map(s => <option key={s} value={s}>{s}</option>)}
                       </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1">หมายเหตุ</label>
+                      <textarea name="notes" defaultValue={(editingItem as Device)?.notes} className="input-field min-h-[80px]" />
                     </div>
                   </>
                 )}
@@ -561,8 +565,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ devices, categories, onUpdate, 
                           if (borrowed) {
                             return (
                               <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-lg bg-white overflow-hidden border border-gray-100">
-                                  <img src={borrowed.imageUrl || `https://picsum.photos/seed/${borrowed.id}/100`} alt="" className="w-full h-full object-cover" />
+                                <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center border border-gray-100">
+                                  <Package className="w-6 h-6 text-gray-300" />
                                 </div>
                                 <div>
                                   <p className="text-sm font-bold text-gray-800">{borrowed.name}</p>

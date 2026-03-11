@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Device, User, DeviceStatus, TranslationKey, Student } from '../types';
-import { Search, RefreshCw, ArrowRightLeft, CheckCircle, Info as InfoIcon, Hash, User as UserIcon, Laptop, CheckSquare, Square } from 'lucide-react';
+import { Search, RefreshCw, ArrowRightLeft, CheckCircle, Info as InfoIcon, Hash, User as UserIcon, Laptop, CheckSquare, Square, Package } from 'lucide-react';
 import { gasHelper } from '../services/gasService';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatThaiDate } from '../constants';
@@ -82,12 +82,12 @@ const BorrowReturn: React.FC<BorrowReturnProps> = ({ devices, currentUser, onUpd
     setIsLoading(true);
     try {
       const result = await gasHelper('borrowDevice', null, {
-        deviceId: selectedDevice.id,
+        deviceId: selectedDevice.serial_number,
         userFid: selectedStudent.studentId,
         userName: selectedStudent.fullName,
         userGrade: selectedStudent.grade,
         userClassroom: selectedStudent.classroom,
-        snDevice: selectedDevice.serial_number,
+        serial_number: selectedDevice.serial_number,
         userRole: 'Student',
         emailId: email || selectedStudent.email,
         borrowNotes: notes,
@@ -115,8 +115,8 @@ const BorrowReturn: React.FC<BorrowReturnProps> = ({ devices, currentUser, onUpd
     setIsLoading(true);
     try {
       const result = await gasHelper('returnDevice', null, {
-        deviceId: device.id,
-        snDevice: device.serial_number,
+        deviceId: device.serial_number,
+        serial_number: device.serial_number,
         recorder: currentUser.name
       });
 
@@ -283,13 +283,13 @@ const BorrowReturn: React.FC<BorrowReturnProps> = ({ devices, currentUser, onUpd
                       >
                         {filteredDevices.map(device => (
                           <button
-                            key={device.id}
+                            key={device.serial_number}
                             onClick={() => { setSelectedDevice(device); setDeviceSearch(''); }}
                             className="w-full px-6 py-4 text-left hover:bg-spk-gray transition-colors flex items-center justify-between group"
                           >
                             <div className="flex items-center gap-4">
-                              <div className="w-12 h-12 rounded-xl bg-gray-100 overflow-hidden">
-                                <img src={device.imageUrl || `https://picsum.photos/seed/${device.id}/100`} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                              <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center">
+                                <Package className="w-6 h-6 text-gray-300" />
                               </div>
                               <div>
                                 <p className="font-bold text-gray-800 group-hover:text-spk-blue transition-colors">{device.name}</p>
@@ -305,13 +305,12 @@ const BorrowReturn: React.FC<BorrowReturnProps> = ({ devices, currentUser, onUpd
                 </div>
               ) : (
                 <div className="flex items-center gap-4 bg-white p-4 rounded-2xl border border-blue-100 shadow-sm">
-                  <div className="w-16 h-16 rounded-xl bg-spk-gray overflow-hidden shadow-inner">
-                    <img src={selectedDevice.imageUrl || `https://picsum.photos/seed/${selectedDevice.id}/100`} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  <div className="w-16 h-16 rounded-xl bg-spk-gray flex items-center justify-center shadow-inner">
+                    <Package className="w-8 h-8 text-gray-300" />
                   </div>
                   <div>
                     <h4 className="font-bold text-xl text-gray-800">{selectedDevice.name}</h4>
                     <p className="text-sm text-gray-500 font-mono uppercase tracking-wider">Serial Number: {selectedDevice.serial_number}</p>
-                    <p className="text-xs text-spk-blue font-bold mt-1">ID: {selectedDevice.id}</p>
                   </div>
                   <div className="ml-auto">
                     <CheckCircle className="w-8 h-8 text-spk-blue" />
@@ -431,15 +430,15 @@ const BorrowReturn: React.FC<BorrowReturnProps> = ({ devices, currentUser, onUpd
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredDevices.map(device => (
               <motion.div
-                key={device.id}
+                key={device.serial_number}
                 layout
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 className="card p-6 border-2 border-transparent hover:border-spk-blue/20 transition-all group"
               >
                 <div className="flex gap-4 mb-6">
-                  <div className="w-20 h-20 rounded-2xl bg-spk-gray overflow-hidden shadow-inner shrink-0">
-                    <img src={device.imageUrl || `https://picsum.photos/seed/${device.id}/200`} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  <div className="w-20 h-20 rounded-2xl bg-spk-gray flex items-center justify-center shadow-inner shrink-0">
+                    <Package className="w-10 h-10 text-gray-300" />
                   </div>
                   <div className="overflow-hidden">
                     <h4 className="font-bold text-lg text-gray-800 truncate">{device.name}</h4>
@@ -451,10 +450,6 @@ const BorrowReturn: React.FC<BorrowReturnProps> = ({ devices, currentUser, onUpd
                 </div>
 
                 <div className="space-y-3 mb-6 p-4 bg-spk-gray/50 rounded-2xl">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-gray-400">ID อุปกรณ์</span>
-                    <span className="font-bold text-spk-blue">{device.id}</span>
-                  </div>
                   {device.borrowedBy && (
                     <div className="flex justify-between text-xs">
                       <span className="text-gray-400">ผู้ยืม</span>

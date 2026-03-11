@@ -90,7 +90,7 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, onRefresh, t }) => {
                 <div key={index} className="flex items-center justify-between p-4 rounded-xl bg-spk-gray/50 hover:bg-spk-gray transition-colors border border-transparent hover:border-gray-200">
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 rounded-lg bg-white shadow-sm flex items-center justify-center overflow-hidden">
-                      <img src={device.imageUrl || 'https://picsum.photos/seed/device/200'} alt={device.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      <Package className="w-6 h-6 text-gray-300" />
                     </div>
                     <div>
                       <p className="font-bold text-gray-800">{device.name}</p>

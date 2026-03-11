@@ -107,6 +107,11 @@ function readData(sheetName) {
       newSheet.appendRow(['studentId', 'fullName', 'grade', 'classroom', 'email']);
       return [];
     }
+    if (sheetName === 'Devices') {
+      const newSheet = SS.insertSheet(sheetName);
+      newSheet.appendRow(['serial_number', 'category_id', 'defaultAccessories', 'borrowedBy', 'status', 'notes']);
+      return [];
+    }
     if (sheetName === 'Teachers') {
       const newSheet = SS.insertSheet(sheetName);
       newSheet.appendRow(['id', 'fullName', 'department', 'email', 'profileImageUrl', 'classroom']);
@@ -150,12 +155,12 @@ function updateData(sheetName, data, user) {
   let rowIndex = -1;
   const key = data.serial_number || data.id || data.email || data.fid || data.studentId || data.borrowerId || data.snDevice;
 
-  // สำหรับ Transactions เราอาจต้องการหาแถวที่ snDevice ตรงกันและสถานะยังเป็น Borrowed
+  // สำหรับ Transactions เราอาจต้องการหาแถวที่ serial_number ตรงกันและสถานะยังเป็น Borrowed
   if (sheetName === 'Transactions' && data.status === 'Returned') {
-    const snIdx = headers.indexOf('snDevice') !== -1 ? headers.indexOf('snDevice') : headers.indexOf('serial_number');
+    const snIdx = headers.indexOf('serial_number') !== -1 ? headers.indexOf('serial_number') : headers.indexOf('snDevice');
     const statusIdx = headers.indexOf('status');
     for (let i = values.length - 1; i >= 1; i--) {
-      if (values[i][snIdx] === (data.snDevice || data.serial_number) && values[i][statusIdx] === 'Borrowed') {
+      if (values[i][snIdx] === (data.serial_number || data.snDevice) && values[i][statusIdx] === 'Borrowed') {
         rowIndex = i + 1;
         break;
       }
@@ -240,7 +245,7 @@ function importTransactions(data, user) {
       sheet.appendRow(row);
 
       // 3. อัปเดตสถานะใน Devices
-      const sn = item.snDevice || item.serial_number;
+      const sn = item.serial_number || item.snDevice;
       if (sn && item.status) {
         let found = false;
         for (let i = 1; i < devValues.length; i++) {
@@ -271,7 +276,7 @@ function borrowDevice(data, user) {
 
   // Ensure Transactions headers exist
   if (trxSheet.getLastRow() === 0) {
-    trxSheet.appendRow(['borrowerId', 'fid', 'fname', 'snDevice', 'borrow_date', 'borrowTime', 'due_date', 'return_date', 'status', 'recorder', 'emailId', 'borrowNotes', 'accessories']);
+    trxSheet.appendRow(['borrowerId', 'fid', 'fname', 'serial_number', 'borrow_date', 'borrowTime', 'due_date', 'return_date', 'status', 'recorder', 'emailId', 'borrowNotes', 'accessories']);
   }
 
   // 1. Calculate Dates
@@ -299,7 +304,7 @@ function borrowDevice(data, user) {
     borrowerId: 'TRX-' + Date.now(),
     fid: data.userFid,
     fname: data.userName,
-    snDevice: data.snDevice,
+    serial_number: data.serial_number,
     borrow_date: borrowDate,
     borrowTime: borrowTime,
     due_date: dueDateStr,
@@ -318,12 +323,12 @@ function borrowDevice(data, user) {
   // 4. Update Device Status
   const devValues = devSheet.getDataRange().getValues();
   const devHeaders = devValues[0];
-  const idIdx = devHeaders.indexOf('id');
+  const snIdx = devHeaders.indexOf('serial_number');
   const statusIdx = devHeaders.indexOf('status');
-  const borrowedByIdx = devHeaders.indexOf('borrowedBy'); // Check if borrowedBy exists
+  const borrowedByIdx = devHeaders.indexOf('borrowedBy');
   
   for (let i = 1; i < devValues.length; i++) {
-    if (devValues[i][idIdx].toString() === data.deviceId.toString()) {
+    if (devValues[i][snIdx].toString() === data.serial_number.toString()) {
       devSheet.getRange(i + 1, statusIdx + 1).setValue('Borrowed');
       if (borrowedByIdx !== -1) {
         devSheet.getRange(i + 1, borrowedByIdx + 1).setValue(data.userName);
@@ -349,13 +354,13 @@ function returnDevice(data, user) {
   // 1. Update Transactions
   const trxValues = trxSheet.getDataRange().getDisplayValues();
   const trxHeaders = trxValues[0];
-  const snIdx = trxHeaders.indexOf('snDevice') !== -1 ? trxHeaders.indexOf('snDevice') : trxHeaders.indexOf('serial_number');
+  const snIdx = trxHeaders.indexOf('serial_number') !== -1 ? trxHeaders.indexOf('serial_number') : trxHeaders.indexOf('snDevice');
   const statusIdx = trxHeaders.indexOf('status');
   const returnDateIdx = trxHeaders.indexOf('return_date');
   
   let foundTrx = false;
   for (let i = trxValues.length - 1; i >= 1; i--) {
-    if (trxValues[i][snIdx] === data.snDevice && trxValues[i][statusIdx] === 'Borrowed') {
+    if (trxValues[i][snIdx] === data.serial_number && trxValues[i][statusIdx] === 'Borrowed') {
       if (returnDateIdx !== -1) {
         trxSheet.getRange(i + 1, returnDateIdx + 1).setValue(returnDate);
       }
@@ -368,12 +373,12 @@ function returnDevice(data, user) {
   // 2. Update Devices
   const devValues = devSheet.getDataRange().getValues();
   const devHeaders = devValues[0];
-  const idIdx = devHeaders.indexOf('id');
+  const snIdx = devHeaders.indexOf('serial_number');
   const devStatusIdx = devHeaders.indexOf('status');
   const borrowedByIdx = devHeaders.indexOf('borrowedBy');
   
   for (let i = 1; i < devValues.length; i++) {
-    if (devValues[i][idIdx].toString() === data.deviceId.toString()) {
+    if (devValues[i][snIdx].toString() === data.serial_number.toString()) {
       devSheet.getRange(i + 1, devStatusIdx + 1).setValue('Available');
       if (borrowedByIdx !== -1) {
         devSheet.getRange(i + 1, borrowedByIdx + 1).setValue('');
@@ -382,7 +387,7 @@ function returnDevice(data, user) {
     }
   }
 
-  logAction(user, 'RETURN', 'Transactions', `Returned device ${data.snDevice} (Recorder: ${data.recorder || 'System'})`);
+  logAction(user, 'RETURN', 'Transactions', `Returned device ${data.serial_number} (Recorder: ${data.recorder || 'System'})`);
   return { success: true };
 }
 

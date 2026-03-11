@@ -39,16 +39,15 @@ export interface Category {
 }
 
 export interface Device {
-  id: string;
-  category_id: string;
   serial_number: string;
+  category_id: string;
   defaultAccessories: string;
+  borrowedBy?: string;
   status: DeviceStatus;
-  borrowedBy?: string; // Added to track who currently has the device
+  notes?: string;
   // Hydrated fields for UI
   name?: string;
   categoryName?: string;
-  imageUrl?: string;
   designatedFor?: string;
 }
 
@@ -102,7 +101,7 @@ export interface Transaction {
   borrowerId: number;
   fid: string;
   fname: string;
-  snDevice: string;
+  serial_number: string;
   borrow_date: string;
   borrowTime: string;
   due_date: string;
