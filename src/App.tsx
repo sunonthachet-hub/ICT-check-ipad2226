@@ -110,21 +110,34 @@ const App: React.FC = () => {
     
     setIsLoading(true);
     try {
-      const [studentsRes, studentsM5Res, studentsM6Res, teachersRes] = await Promise.all([
-        gasHelper('read', 'Students'),
+      const [studentsM4Res, studentsM5Res, studentsM6Res, teachersRes] = await Promise.all([
+        gasHelper('read', 'StudentsM4'),
         gasHelper('read', 'StudentsM5'),
         gasHelper('read', 'StudentsM6'),
         gasHelper('read', 'Teachers')
       ]);
 
       const allStudents = [
-        ...(studentsRes.data as Student[] || []),
-        ...(studentsM5Res.data as Student[] || []),
-        ...(studentsM6Res.data as Student[] || [])
-      ].map(s => ({
-        ...s,
-        grade: normalizeGrade(s.grade)
-      }));
+        ...(studentsM4Res.success ? studentsM4Res.data as any[] : []),
+        ...(studentsM5Res.success ? studentsM5Res.data as any[] : []),
+        ...(studentsM6Res.success ? studentsM6Res.data as any[] : [])
+      ].map(s => {
+        // Robust mapping for student name
+        const fullName = s.fullName || s['ชื่อ-นามสกุล'] || s['ชื่อ'] || s['name'] || 'ยังไม่ระบุ';
+        const studentId = s.studentId || s['รหัสนักเรียน'] || s['รหัสประจำตัว'] || s['id'] || 'ยังไม่ระบุ';
+        const grade = normalizeGrade(s.grade || s['ชั้น'] || s['ระดับชั้น']);
+        const classroom = s.classroom || s['ห้อง'] || 'ยังไม่ระบุ';
+        const email = s.email || s['อีเมล'] || 'ยังไม่ระบุ';
+
+        return {
+          ...s,
+          studentId: String(studentId),
+          fullName,
+          grade,
+          classroom: String(classroom),
+          email
+        };
+      });
 
       setStudents(allStudents);
       if (teachersRes.success) setTeachers(teachersRes.data as Teacher[]);

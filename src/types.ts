@@ -84,6 +84,8 @@ export interface ServiceReport {
   issue_type: string;
   details: string;
   email: string;
+  studentName?: string;
+  classroom?: string;
   photo_url: string;
   reportedAt: string;
   status: 'Pending' | 'In Progress' | 'Resolved';

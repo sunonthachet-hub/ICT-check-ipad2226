@@ -53,11 +53,11 @@ const BorrowReturn: React.FC<BorrowReturnProps> = ({ devices, currentUser, onUpd
   const students = devices.students || [];
 
   const filteredStudents = useMemo(() => {
-    if (!debouncedStudentSearch || selectedStudent) return [];
+    if (!debouncedStudentSearch || debouncedStudentSearch.length < 2 || selectedStudent) return [];
     const search = debouncedStudentSearch.toLowerCase();
     return students.filter(s => 
-      s.fullName.toLowerCase().includes(search) ||
-      s.studentId.toString().includes(search)
+      (s.fullName && s.fullName.toLowerCase().includes(search)) ||
+      (s.studentId && s.studentId.toString().includes(search))
     ).slice(0, 20); // Limit to 20 results
   }, [students, debouncedStudentSearch, selectedStudent]);
 

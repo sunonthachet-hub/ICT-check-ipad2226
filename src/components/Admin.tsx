@@ -48,6 +48,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ devices, categories, onUpdate, 
     if (type === 'Students' && item) {
       if (item.grade === 'ม.5') sheetName = 'StudentsM5';
       else if (item.grade === 'ม.6') sheetName = 'StudentsM6';
+      else sheetName = 'StudentsM4';
     }
     if (type === 'ServiceLog') sheetName = 'serviceLogs';
 
@@ -384,6 +385,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ devices, categories, onUpdate, 
                   <td className="px-6 py-4">
                     <p className="font-bold text-gray-800">{report.issue_type}</p>
                     <p className="text-[10px] text-gray-400 font-mono uppercase tracking-wider">Device: {report.deviceId}</p>
+                    {report.studentName && (
+                      <p className="text-[10px] text-spk-blue font-bold mt-1">
+                        ผู้แจ้ง: {report.studentName} {report.classroom ? `(${report.classroom})` : ''}
+                      </p>
+                    )}
                   </td>
                   <td className="px-6 py-4">
                     <p className="text-xs text-gray-400 truncate max-w-xs">{report.details}</p>
@@ -454,7 +460,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ devices, categories, onUpdate, 
                 if (activeSubTab === 'students') {
                   if (data.grade === 'ม.5') sheetName = 'StudentsM5';
                   else if (data.grade === 'ม.6') sheetName = 'StudentsM6';
-                  else sheetName = 'Students';
+                  else sheetName = 'StudentsM4';
                 }
 
                 const result = await gasHelper(action, sheetName, data);

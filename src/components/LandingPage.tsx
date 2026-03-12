@@ -12,12 +12,15 @@ interface LandingPageProps {
   devices: Device[];
 }
 
-type Section = 'home' | 'report' | 'products' | 'rules' | 'contact';
+type Section = 'home' | 'report' | 'products' | 'rules' | 'contact' | 'content';
 
 const LandingPage: React.FC<LandingPageProps> = ({ onStart, onAdminLogin, dbConnected, categories, devices }) => {
   const [activeSection, setActiveSection] = useState<Section>('home');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [studentId, setStudentId] = useState('');
+  const [isVerified, setIsVerified] = useState(false);
+  const [verifiedStudent, setVerifiedStudent] = useState<any>(null);
   const [reportForm, setReportForm] = useState({
     device_id: '',
     issue_type: '',
@@ -26,11 +29,30 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart, onAdminLogin, dbConn
 
   const navItems = [
     { label: 'หน้าแรก', id: 'home' as Section },
-    { label: 'แจ้งปัญหา', id: 'report' as Section },
-    { label: 'รายการสินค้า', id: 'products' as Section },
+    { label: 'แจ้งปัญหาการใช้งาน', id: 'report' as Section },
+    { label: 'สาระสร้างเอง', id: 'content' as Section },
+    { label: 'อุปกรณ์การเรียน', id: 'products' as Section },
     { label: 'ระเบียบการยืม', id: 'rules' as Section },
     { label: 'ติดต่อสอบถาม', id: 'contact' as Section },
   ];
+
+  const handleVerifyStudent = async () => {
+    if (!studentId) return;
+    setIsSubmitting(true);
+    try {
+      const res = await gasHelper('verifyStudent', '', { studentId });
+      if (res.success && res.data) {
+        setIsVerified(true);
+        setVerifiedStudent(res.data);
+      } else {
+        alert('ไม่พบรหัสนักเรียนในระบบ กรุณาตรวจสอบอีกครั้ง');
+      }
+    } catch (error) {
+      alert('เกิดข้อผิดพลาดในการตรวจสอบข้อมูล');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleReportSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,14 +63,21 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart, onAdminLogin, dbConn
 
     setIsSubmitting(true);
     try {
-      const res = await gasHelper('append', 'Service', {
-        ...reportForm,
-        report_date: new Date().toLocaleString('th-TH'),
-        status: 'Pending'
+      const res = await gasHelper('reportService', 'Service', {
+        deviceId: reportForm.device_id,
+        issue_type: reportForm.issue_type,
+        details: reportForm.details,
+        email: verifiedStudent?.email || '',
+        studentName: verifiedStudent?.fullName || '',
+        studentId: verifiedStudent?.studentId || '',
+        classroom: verifiedStudent?.classroom || ''
       });
       if (res.success) {
         setSubmitSuccess(true);
         setReportForm({ device_id: '', issue_type: '', details: '' });
+        setStudentId('');
+        setIsVerified(false);
+        setVerifiedStudent(null);
         setTimeout(() => setSubmitSuccess(false), 5000);
       } else {
         alert('เกิดข้อผิดพลาดในการส่งรายงาน: ' + res.error);
@@ -60,6 +89,19 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart, onAdminLogin, dbConn
       setIsSubmitting(false);
     }
   };
+
+  const ipadApps = [
+    { name: 'Goodnotes 6', desc: 'แอปจดบันทึกยอดนิยมสำหรับนักเรียน', icon: 'edit' },
+    { name: 'Notability', desc: 'จดบันทึกพร้อมอัดเสียงได้ในตัว', icon: 'mic' },
+    { name: 'Procreate', desc: 'แอปวาดภาพระดับมืออาชีพ', icon: 'palette' },
+    { name: 'Canva', desc: 'ออกแบบกราฟิกและพรีเซนเทชันง่ายๆ', icon: 'layout' },
+    { name: 'Zoom', desc: 'ประชุมและเรียนออนไลน์', icon: 'video' },
+    { name: 'Google Drive', desc: 'เก็บข้อมูลและทำงานร่วมกัน', icon: 'cloud' },
+    { name: 'Microsoft Office', desc: 'Word, Excel, PowerPoint ครบวงจร', icon: 'file-text' },
+    { name: 'Quizlet', desc: 'สร้างบัตรคำศัพท์ช่วยจำ', icon: 'book-open' },
+    { name: 'Duolingo', desc: 'ฝึกภาษาต่างประเทศแบบสนุกๆ', icon: 'languages' },
+    { name: 'Khan Academy', desc: 'แหล่งเรียนรู้ฟรีทุกวิชา', icon: 'graduation-cap' },
+  ];
 
   const renderSection = () => {
     switch (activeSection) {
@@ -139,22 +181,37 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart, onAdminLogin, dbConn
                   <AlertTriangle className="text-red-500 w-8 h-8" />
                 </div>
                 <div>
-                  <h2 className="text-3xl font-black text-white">แจ้งปัญหาการใช้งาน</h2>
+                  <h2 className="text-3xl font-black text-white">แจ้งปัญหาการใช้งาน / แจ้งซ่อม</h2>
                   <p className="text-slate-400">พบปัญหาเกี่ยวกับตัวเครื่อง iPad หรือซอฟต์แวร์? แจ้งเราได้ที่นี่</p>
                 </div>
               </div>
 
-              <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-6 mb-10">
-                <h4 className="text-red-400 font-bold flex items-center gap-2 mb-2">
-                  <AlertTriangle className="w-5 h-5" />
-                  แจ้งซ่อมด่วน
-                </h4>
-                <p className="text-red-400/80 text-sm">
-                  หากอุปกรณ์เกิดความเสียหายรุนแรง กรุณานำเครื่องมาที่ศูนย์ ICT ทันที
-                </p>
-              </div>
-
-              {submitSuccess ? (
+              {!isVerified && !submitSuccess ? (
+                <div className="space-y-6">
+                  <div className="bg-spk-blue/10 border border-spk-blue/20 rounded-2xl p-8">
+                    <h4 className="text-spk-blue font-bold mb-4 text-xl">ค้นหาข้อมูลนักเรียน</h4>
+                    <p className="text-slate-400 text-sm mb-6">กรุณากรอกรหัสนักเรียนเพื่อตรวจสอบข้อมูลก่อนแจ้งปัญหา</p>
+                    <div className="flex flex-col md:flex-row gap-4">
+                      <div className="flex-1 relative">
+                        <input 
+                          type="text" 
+                          value={studentId}
+                          onChange={(e) => setStudentId(e.target.value)}
+                          placeholder="พิมพ์รหัสนักเรียน..."
+                          className="w-full bg-slate-900 border border-white/10 rounded-xl px-5 py-4 text-white focus:border-spk-yellow outline-none text-lg"
+                        />
+                      </div>
+                      <button 
+                        onClick={handleVerifyStudent}
+                        disabled={isSubmitting}
+                        className="px-10 py-4 bg-spk-yellow text-spk-blue font-black rounded-xl hover:bg-white transition-all cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        {isSubmitting ? <RefreshCw className="animate-spin" /> : 'ตรวจสอบข้อมูล'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : submitSuccess ? (
                 <motion.div 
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
@@ -164,9 +221,12 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart, onAdminLogin, dbConn
                     <CheckCircle2 className="text-white w-12 h-12" />
                   </div>
                   <h3 className="text-2xl font-bold text-white mb-2">ส่งรายงานสำเร็จ</h3>
-                  <p className="text-slate-400 mb-8">เจ้าหน้าที่จะดำเนินการตรวจสอบและติดต่อกลับโดยเร็วที่สุด</p>
+                  <p className="text-slate-400 mb-8">เจ้าหน้าที่จะดำเนินการตรวจสอบและอนุมัติรายการแจ้งซ่อมโดยเร็วที่สุด</p>
                   <button 
-                    onClick={() => setSubmitSuccess(false)}
+                    onClick={() => {
+                      setSubmitSuccess(false);
+                      setIsVerified(false);
+                    }}
                     className="px-8 py-3 bg-white/10 hover:bg-white/20 rounded-xl font-bold transition-all cursor-pointer"
                   >
                     แจ้งปัญหาเพิ่ม
@@ -174,21 +234,36 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart, onAdminLogin, dbConn
                 </motion.div>
               ) : (
                 <form onSubmit={handleReportSubmit} className="space-y-8">
+                  <div className="bg-green-500/10 border border-green-500/20 rounded-2xl p-6 mb-6">
+                    <div className="flex items-center gap-3 mb-4">
+                      <CheckCircle2 className="text-green-500 w-6 h-6" />
+                      <span className="text-green-400 font-black text-xl">ยืนยันตัวตนสำเร็จ</span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="p-4 bg-white/5 rounded-xl border border-white/5">
+                        <p className="text-slate-500 text-xs uppercase font-bold mb-1">ชื่อ-นามสกุล</p>
+                        <p className="text-white font-bold">{verifiedStudent?.fullName}</p>
+                      </div>
+                      <div className="p-4 bg-white/5 rounded-xl border border-white/5">
+                        <p className="text-slate-500 text-xs uppercase font-bold mb-1">ชั้น / ห้อง</p>
+                        <p className="text-white font-bold">{verifiedStudent?.grade} / {verifiedStudent?.classroom}</p>
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div className="space-y-3">
                       <label className="text-sm font-bold text-slate-400 uppercase tracking-wider">เลือกอุปกรณ์ที่มีปัญหา</label>
-                      <div className="flex gap-2">
-                        <select 
-                          value={reportForm.device_id}
-                          onChange={(e) => setReportForm({...reportForm, device_id: e.target.value})}
-                          className="w-full bg-slate-900 border border-white/10 rounded-xl px-5 py-4 text-white focus:border-spk-yellow outline-none transition-all appearance-none cursor-pointer"
-                        >
-                          <option value="">-- เลือกอุปกรณ์ --</option>
-                          {devices.map(d => (
-                            <option key={d.id} value={d.id}>{d.name} ({d.serial_number})</option>
-                          ))}
-                        </select>
-                      </div>
+                      <select 
+                        value={reportForm.device_id}
+                        onChange={(e) => setReportForm({...reportForm, device_id: e.target.value})}
+                        className="w-full bg-slate-900 border border-white/10 rounded-xl px-5 py-4 text-white focus:border-spk-yellow outline-none transition-all appearance-none cursor-pointer"
+                      >
+                        <option value="">-- เลือกอุปกรณ์ --</option>
+                        {devices.map(d => (
+                          <option key={d.serial_number} value={d.serial_number}>{d.serial_number} ({categories.find(c => c.id === d.category_id)?.name || 'ไม่ทราบรุ่น'})</option>
+                        ))}
+                      </select>
                     </div>
                     <div className="space-y-3">
                       <label className="text-sm font-bold text-slate-400 uppercase tracking-wider">ประเภทปัญหา</label>
@@ -218,35 +293,65 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart, onAdminLogin, dbConn
                     ></textarea>
                   </div>
 
-                  <div className="space-y-3">
-                    <label className="text-sm font-bold text-slate-400 uppercase tracking-wider">แนบรูปภาพประกอบ (ถ้ามี)</label>
-                    <div className="flex items-center justify-center w-full">
-                      <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-white/10 border-dashed rounded-xl cursor-pointer bg-slate-900/50 hover:bg-slate-900 transition-all">
-                        <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                          <Camera className="w-8 h-8 text-slate-500 mb-2" />
-                          <p className="text-xs text-slate-500">คลิกเพื่ออัปโหลดรูปภาพ</p>
-                        </div>
-                        <input type="file" className="hidden" accept="image/*" />
-                      </label>
-                    </div>
+                  <div className="flex gap-4">
+                    <button 
+                      type="button"
+                      onClick={() => setIsVerified(false)}
+                      className="px-8 py-5 bg-white/5 text-white font-bold rounded-2xl hover:bg-white/10 transition-all cursor-pointer"
+                    >
+                      ยกเลิก
+                    </button>
+                    <button 
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="flex-1 py-5 bg-spk-yellow text-spk-blue font-black text-xl rounded-2xl shadow-xl shadow-spk-yellow/20 hover:bg-white transition-all flex items-center justify-center gap-3 disabled:opacity-50 cursor-pointer"
+                    >
+                      {isSubmitting ? (
+                        <RefreshCw className="w-6 h-6 animate-spin" />
+                      ) : (
+                        <>
+                          <Send className="w-6 h-6" />
+                          ส่งรายงานปัญหา
+                        </>
+                      )}
+                    </button>
                   </div>
-
-                  <button 
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="w-full py-5 bg-spk-yellow text-spk-blue font-black text-xl rounded-2xl shadow-xl shadow-spk-yellow/20 hover:bg-white transition-all flex items-center justify-center gap-3 disabled:opacity-50 cursor-pointer"
-                  >
-                    {isSubmitting ? (
-                      <RefreshCw className="w-6 h-6 animate-spin" />
-                    ) : (
-                      <>
-                        <Send className="w-6 h-6" />
-                        ส่งรายงานปัญหา
-                      </>
-                    )}
-                  </button>
                 </form>
               )}
+            </div>
+          </motion.div>
+        );
+      case 'content':
+        return (
+          <motion.div 
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="pt-10"
+          >
+            <div className="flex items-center gap-4 mb-12">
+              <div className="w-16 h-16 bg-spk-yellow/20 rounded-2xl flex items-center justify-center">
+                <FileText className="text-spk-yellow w-8 h-8" />
+              </div>
+              <div>
+                <h2 className="text-3xl font-black text-white">สาระสร้างเอง</h2>
+                <p className="text-slate-400">แอปพลิเคชันแนะนำสำหรับการเรียนรู้บน iPad</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+              {ipadApps.map((app, i) => (
+                <motion.div 
+                  key={i}
+                  whileHover={{ y: -10 }}
+                  className="bg-white/5 backdrop-blur-xl rounded-3xl border border-white/10 p-6 text-center group hover:border-spk-yellow/50 transition-all"
+                >
+                  <div className="w-16 h-16 bg-slate-900 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:bg-spk-yellow transition-colors">
+                    <span className="material-icons text-white group-hover:text-spk-blue text-3xl">{app.icon}</span>
+                  </div>
+                  <h4 className="text-lg font-bold text-white mb-2">{app.name}</h4>
+                  <p className="text-slate-500 text-xs leading-relaxed">{app.desc}</p>
+                </motion.div>
+              ))}
             </div>
           </motion.div>
         );
@@ -262,7 +367,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart, onAdminLogin, dbConn
                 <Package className="text-spk-blue w-8 h-8" />
               </div>
               <div>
-                <h2 className="text-3xl font-black text-white">รายการสินค้า</h2>
+                <h2 className="text-3xl font-black text-white">อุปกรณ์การเรียน</h2>
                 <p className="text-slate-400">อุปกรณ์ไอทีทั้งหมดที่พร้อมให้บริการ</p>
               </div>
             </div>
@@ -460,7 +565,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart, onAdminLogin, dbConn
               className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white/10 text-white font-bold text-sm hover:bg-spk-yellow hover:text-spk-blue transition-all shadow-sm backdrop-blur-md cursor-pointer"
             >
               <LogIn className="w-4 h-4" />
-              เข้าระบบ แอดมิน
+              เข้าระบบ
             </button>
           </div>
         </div>

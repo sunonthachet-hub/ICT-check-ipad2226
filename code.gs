@@ -35,6 +35,7 @@ function doPost(e) {
       case 'borrowDevice': result = borrowDevice(data, user); break;
       case 'returnDevice': result = returnDevice(data, user); break;
       case 'reportService': result = reportService(data, user); break;
+      case 'verifyStudent': result = verifyStudent(data.studentId); break;
       default: throw new Error('Action not found: ' + action);
     }
 
@@ -78,7 +79,7 @@ function readData(sheetName) {
     } else if (sheetName === 'Categories') {
       sheet = SS.insertSheet(sheetName);
       sheet.appendRow(['id', 'name', 'description', 'designatedFor', 'imageUrl']);
-    } else if (sheetName === 'Students' || sheetName === 'StudentsM5' || sheetName === 'StudentsM6') {
+    } else if (sheetName === 'StudentsM4' || sheetName === 'StudentsM5' || sheetName === 'StudentsM6') {
       sheet = SS.insertSheet(sheetName);
       sheet.appendRow(['studentId', 'fullName', 'grade', 'classroom', 'email']);
     } else {
@@ -90,7 +91,13 @@ function readData(sheetName) {
   const headers = values[0];
   return values.slice(1).map(row => {
     let obj = {};
-    headers.forEach((h, i) => obj[h] = row[i]);
+    headers.forEach((h, i) => {
+      let val = row[i];
+      if (val === "" || val === null || val === undefined) {
+        val = "ยังไม่ระบุ";
+      }
+      obj[h] = val;
+    });
     return obj;
   });
 }
@@ -257,7 +264,7 @@ function returnDevice(data, user) {
 function reportService(data, user) {
   const sheet = SS.getSheetByName('Service') || SS.insertSheet('Service');
   if (sheet.getLastRow() === 0) {
-    sheet.appendRow(['id', 'deviceId', 'issue_type', 'details', 'email', 'photo_url', 'reportedAt', 'status']);
+    sheet.appendRow(['id', 'deviceId', 'issue_type', 'details', 'email', 'studentName', 'classroom', 'photo_url', 'reportedAt', 'status']);
   }
   
   const id = 'SRV-' + Date.now();
@@ -274,6 +281,8 @@ function reportService(data, user) {
     issue_type: data.issue_type,
     details: data.details, 
     email: data.email || (user ? user.email : ""),
+    studentName: data.studentName || "",
+    classroom: data.classroom || "",
     photo_url: photoUrl, 
     reportedAt: Utilities.formatDate(new Date(), "GMT+7", "yyyy-MM-dd HH:mm:ss"),
     status: 'Pending'
@@ -350,6 +359,42 @@ function importTransactions(data, user) {
 }
 
 /** --- 5. ฟังก์ชันเสริม --- **/
+
+function verifyStudent(studentId) {
+  const sheets = ['StudentsM4', 'StudentsM5', 'StudentsM6'];
+  for (const name of sheets) {
+    const sheet = SS.getSheetByName(name);
+    if (!sheet) continue;
+    const values = sheet.getDataRange().getDisplayValues();
+    const headers = values[0];
+    
+    // Find ID index with multiple possibilities
+    let idIdx = headers.indexOf('studentId');
+    if (idIdx === -1) idIdx = headers.indexOf('รหัสนักเรียน');
+    if (idIdx === -1) idIdx = headers.indexOf('รหัสประจำตัว');
+    if (idIdx === -1) idIdx = 0; // Fallback to first column
+    
+    const studentRow = values.slice(1).find(r => r[idIdx] === studentId);
+    if (studentRow) {
+      let obj = {};
+      headers.forEach((h, i) => {
+        let val = studentRow[i];
+        if (val === "" || val === null || val === undefined) val = "ยังไม่ระบุ";
+        obj[h] = val;
+      });
+      
+      // Normalize keys for frontend
+      return {
+        studentId: studentRow[idIdx],
+        fullName: obj.fullName || obj['ชื่อ-นามสกุล'] || obj['ชื่อ'] || obj['name'] || 'ยังไม่ระบุ',
+        grade: obj.grade || obj['ชั้น'] || obj['ระดับชั้น'] || name.replace('Students', ''),
+        classroom: obj.classroom || obj['ห้อง'] || 'ยังไม่ระบุ',
+        email: obj.email || obj['อีเมล'] || 'ยังไม่ระบุ'
+      };
+    }
+  }
+  return null;
+}
 
 function logAction(user, action, target, details) {
   const sheet = SS.getSheetByName('Logs') || SS.insertSheet('Logs');
