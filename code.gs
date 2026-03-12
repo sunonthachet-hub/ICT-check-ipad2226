@@ -1,16 +1,23 @@
 /**
- * SPK ICT Inventory System Backend (code.gs)
- * ปรับปรุงล่าสุด: รองรับการบันทึกวันที่แบบ ค.ศ. และดึงข้อมูลเป็น String ทั้งหมด
+ * SPK ICT Inventory System Backend (Unified Version)
+ * ปรับปรุงล่าสุด: รวมทุกฟังก์ชัน, รองรับการอัปโหลดรูปภาพ, และจัดการ Serial Number เป็นหลัก
  */
+
+const CONFIG = {
+  // ใช้ getActiveSpreadsheet() เพื่อความสะดวกในการใช้งานกับชีทที่ผูกสคริปต์ไว้
+  // หรือระบุ ID ถ้าต้องการแยกชีท
+  UPLOAD_FOLDER_ID: '1YOccTHgmK8R4QAW89PLtcvMFb8DAMu7t', 
+};
 
 const SS = SpreadsheetApp.getActiveSpreadsheet();
 
 function doGet(e) {
-  return HtmlService.createHtmlOutput("SPK ICT API is Running");
+  return HtmlService.createHtmlOutput("SPK ICT API is Running (Unified Version - Stable)");
 }
 
 function doPost(e) {
   try {
+    if (!e.postData || !e.postData.contents) throw new Error("No data received");
     const params = JSON.parse(e.postData.contents);
     const action = params.action;
     const sheetName = params.sheetName;
@@ -19,35 +26,16 @@ function doPost(e) {
 
     let result;
     switch (action) {
-      case 'login':
-        result = login(data);
-        break;
-      case 'read':
-        result = readData(sheetName);
-        break;
-      case 'append':
-        result = appendData(sheetName, data, user);
-        break;
-      case 'update':
-        result = updateData(sheetName, data, user);
-        break;
-      case 'delete':
-        result = deleteData(sheetName, data, user);
-        break;
-      case 'importTransactions':
-        result = importTransactions(data, user);
-        break;
-      case 'borrowDevice':
-        result = borrowDevice(data, user);
-        break;
-      case 'returnDevice':
-        result = returnDevice(data, user);
-        break;
-      case 'reportService':
-        result = reportService(data, user);
-        break;
-      default:
-        throw new Error('Action not found: ' + action);
+      case 'login': result = login(data); break;
+      case 'read':  result = readData(sheetName); break;
+      case 'append': result = appendData(sheetName, data, user); break;
+      case 'update': result = updateData(sheetName, data, user); break;
+      case 'delete': result = deleteData(sheetName, data, user); break;
+      case 'importTransactions': result = importTransactions(data, user); break;
+      case 'borrowDevice': result = borrowDevice(data, user); break;
+      case 'returnDevice': result = returnDevice(data, user); break;
+      case 'reportService': result = reportService(data, user); break;
+      default: throw new Error('Action not found: ' + action);
     }
 
     return ContentService.createTextOutput(JSON.stringify({ success: true, data: result }))
@@ -58,141 +46,103 @@ function doPost(e) {
   }
 }
 
-/**
- * ตรวจสอบการเข้าสู่ระบบ
- */
+/** --- 1. ระบบจัดการข้อมูลพื้นฐาน (CRUD) --- **/
+
 function login(data) {
   const sheet = SS.getSheetByName('Users');
   if (!sheet) throw new Error('Sheet "Users" not found');
   
   const values = sheet.getDataRange().getDisplayValues();
-  const headers = values[0];
-  const lowerHeaders = headers.map(h => h.toLowerCase());
+  const headers = values[0].map(h => h.toLowerCase());
+  const uIdx = headers.indexOf('users');
+  const pIdx = headers.indexOf('password');
   
-  const userIndex = lowerHeaders.indexOf('users');
-  const passIndex = lowerHeaders.indexOf('password');
+  const userRow = values.slice(1).find(r => r[uIdx] === data.users && r[pIdx] === data.password);
+  if (!userRow) throw new Error('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
   
-  if (userIndex === -1 || passIndex === -1) {
-    throw new Error('Columns "users" or "password" not found in Users sheet');
-  }
-  
-  const user = values.slice(1).find(row => 
-    row[userIndex] === data.users && row[passIndex] === data.password
-  );
-  
-  if (!user) throw new Error('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
-  
-  let userObj = {};
-  headers.forEach((header, i) => {
-    userObj[header] = user[i];
-  });
-  
-  return userObj;
+  let obj = {};
+  values[0].forEach((h, i) => obj[h] = userRow[i]);
+  return obj;
 }
 
-/**
- * อ่านข้อมูลจากชีท โดยใช้ getDisplayValues เพื่อให้ได้ค่าที่เป็น String ตามที่แสดงในหน้าชีท
- * ช่วยลดปัญหาเรื่อง Format วันที่เพี้ยน
- */
 function readData(sheetName) {
-  const sheet = SS.getSheetByName(sheetName);
+  let sheet = SS.getSheetByName(sheetName);
   if (!sheet) {
+    // สร้างชีทพื้นฐานถ้ายังไม่มี
     if (sheetName === 'Users') {
-      const newSheet = SS.insertSheet(sheetName);
-      newSheet.appendRow(['users', 'password', 'name', 'role']);
+      sheet = SS.insertSheet(sheetName);
+      sheet.appendRow(['users', 'password', 'name', 'role']);
+    } else if (sheetName === 'Devices') {
+      sheet = SS.insertSheet(sheetName);
+      sheet.appendRow(['serial_number', 'category_id', 'defaultAccessories', 'borrowedBy', 'status', 'notes']);
+    } else if (sheetName === 'Categories') {
+      sheet = SS.insertSheet(sheetName);
+      sheet.appendRow(['id', 'name', 'description', 'designatedFor', 'imageUrl']);
+    } else if (sheetName === 'Students' || sheetName === 'StudentsM5' || sheetName === 'StudentsM6') {
+      sheet = SS.insertSheet(sheetName);
+      sheet.appendRow(['studentId', 'fullName', 'grade', 'classroom', 'email']);
+    } else {
       return [];
     }
-    if (sheetName === 'Students' || sheetName === 'StudentsM5' || sheetName === 'StudentsM6') {
-      const newSheet = SS.insertSheet(sheetName);
-      newSheet.appendRow(['studentId', 'fullName', 'grade', 'classroom', 'email']);
-      return [];
-    }
-    if (sheetName === 'Devices') {
-      const newSheet = SS.insertSheet(sheetName);
-      newSheet.appendRow(['serial_number', 'category_id', 'defaultAccessories', 'borrowedBy', 'status', 'notes']);
-      return [];
-    }
-    if (sheetName === 'Teachers') {
-      const newSheet = SS.insertSheet(sheetName);
-      newSheet.appendRow(['id', 'fullName', 'department', 'email', 'profileImageUrl', 'classroom']);
-      return [];
-    }
-    if (sheetName === 'serviceLogs') {
-      const newSheet = SS.insertSheet(sheetName);
-      newSheet.appendRow(['id', 'product_id', 'issue', 'report_date', 'status']);
-      return [];
-    }
-    return [];
   }
   
-  const values = sheet.getDataRange().getDisplayValues(); 
+  const values = sheet.getDataRange().getDisplayValues();
   const headers = values[0];
-  
   return values.slice(1).map(row => {
     let obj = {};
-    headers.forEach((header, i) => {
-      obj[header] = row[i];
-    });
+    headers.forEach((h, i) => obj[h] = row[i]);
     return obj;
   });
 }
 
 function appendData(sheetName, data, user) {
   const sheet = SS.getSheetByName(sheetName);
+  if (!sheet) throw new Error('Sheet not found: ' + sheetName);
+  
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
   const row = headers.map(h => data[h] !== undefined ? data[h] : "");
   sheet.appendRow(row);
+  
   logAction(user, 'APPEND', sheetName, JSON.stringify(data));
   return true;
 }
 
 function updateData(sheetName, data, user) {
   const sheet = SS.getSheetByName(sheetName);
+  if (!sheet) throw new Error('Sheet not found: ' + sheetName);
+  
   const values = sheet.getDataRange().getDisplayValues();
   const headers = values[0];
   
-  // ค้นหาแถวที่จะอัปเดต
   let rowIndex = -1;
-  const key = data.serial_number || data.id || data.email || data.fid || data.studentId || data.borrowerId || data.snDevice;
-
-  // สำหรับ Transactions เราอาจต้องการหาแถวที่ serial_number ตรงกันและสถานะยังเป็น Borrowed
-  if (sheetName === 'Transactions' && data.status === 'Returned') {
-    const snIdx = headers.indexOf('serial_number') !== -1 ? headers.indexOf('serial_number') : headers.indexOf('snDevice');
-    const statusIdx = headers.indexOf('status');
-    for (let i = values.length - 1; i >= 1; i--) {
-      if (values[i][snIdx] === (data.serial_number || data.snDevice) && values[i][statusIdx] === 'Borrowed') {
-        rowIndex = i + 1;
-        break;
-      }
+  const key = data.serial_number || data.id || data.studentId || data.users || data.email || data.fid;
+  
+  for (let i = 1; i < values.length; i++) {
+    if (values[i].includes(key)) {
+      rowIndex = i + 1;
+      break;
     }
   }
-
-  if (rowIndex === -1) {
-    for (let i = 1; i < values.length; i++) {
-      if (values[i].includes(key)) {
-        rowIndex = i + 1;
-        break;
-      }
-    }
-  }
-
-  if (rowIndex === -1) throw new Error('Data not found for update: ' + key);
-
+  
+  if (rowIndex === -1) throw new Error('Data not found for key: ' + key);
+  
   const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
   headerRow.forEach((header, i) => {
     if (data[header] !== undefined) {
       sheet.getRange(rowIndex, i + 1).setValue(data[header]);
     }
   });
-
+  
   logAction(user, 'UPDATE', sheetName, JSON.stringify(data));
   return true;
 }
 
 function deleteData(sheetName, data, user) {
   const sheet = SS.getSheetByName(sheetName);
+  if (!sheet) return false;
+  
   const values = sheet.getDataRange().getDisplayValues();
-  const key = data.serial_number || data.id || data.email || data.fid;
+  const key = data.serial_number || data.id || data.users || data.email;
   
   for (let i = 1; i < values.length; i++) {
     if (values[i].includes(key)) {
@@ -204,102 +154,30 @@ function deleteData(sheetName, data, user) {
   return false;
 }
 
-function importTransactions(data, user) {
-  const sheet = SS.getSheetByName('Transactions');
-  const devSheet = SS.getSheetByName('Devices');
-  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  
-  const devValues = devSheet.getDataRange().getValues();
-  const devHeaders = devValues[0];
-  const devSerialIdx = devHeaders.indexOf('serial_number');
-  const devStatusIdx = devHeaders.indexOf('status');
-
-  let successCount = 0;
-  let failCount = 0;
-  let errors = [];
-
-  data.forEach((item, index) => {
-    try {
-      // 1. จัดการข้อมูลพื้นฐานและค่าเริ่มต้น
-      if (!item.borrowerId) {
-        item.borrowerId = 'TRX-' + Date.now() + '-' + index;
-      }
-      if (!item.emailId || item.emailId === "") item.emailId = "ยังไม่ระบุ";
-      if (!item.borrowNotes || item.borrowNotes === "") item.borrowNotes = "ยังไม่ระบุ";
-      
-      // คำนวณ due_date ถ้าไม่มี (นักเรียน 3 ปี, อื่นๆ 14 วัน)
-      if (!item.due_date && (item.borrowDate || item.borrow_date)) {
-        const bDate = new Date(item.borrowDate || item.borrow_date);
-        if (!isNaN(bDate.getTime())) {
-          if (item.role === 'Student' || item.userRole === 'Student') {
-            bDate.setFullYear(bDate.getFullYear() + 3);
-          } else {
-            bDate.setDate(bDate.getDate() + 14);
-          }
-          item.due_date = Utilities.formatDate(bDate, "GMT+7", "yyyy-MM-dd");
-        }
-      }
-
-      // 2. บันทึกลง Transactions
-      const row = headers.map(h => item[h] !== undefined ? item[h] : "");
-      sheet.appendRow(row);
-
-      // 3. อัปเดตสถานะใน Devices
-      const sn = item.serial_number || item.snDevice;
-      if (sn && item.status) {
-        let found = false;
-        for (let i = 1; i < devValues.length; i++) {
-          if (devValues[i][devSerialIdx] === sn) {
-            const newStatus = item.status === 'Borrowed' ? 'Borrowed' : 'Available';
-            devSheet.getRange(i + 1, devStatusIdx + 1).setValue(newStatus);
-            found = true;
-            break;
-          }
-        }
-      }
-      successCount++;
-    } catch (e) {
-      failCount++;
-      errors.push(`Row ${index + 1}: ${e.message}`);
-    }
-  });
-  
-  logAction(user, 'IMPORT', 'Transactions', `Imported ${data.length} items and updated device statuses`);
-  return { success: true, successCount, failCount, errors };
-}
+/** --- 2. ระบบจัดการยืม-คืน (Borrow/Return) --- **/
 
 function borrowDevice(data, user) {
   const trxSheet = SS.getSheetByName('Transactions') || SS.insertSheet('Transactions');
   const devSheet = SS.getSheetByName('Devices');
   
-  if (!trxSheet || !devSheet) throw new Error('Sheets not found');
-
-  // Ensure Transactions headers exist
   if (trxSheet.getLastRow() === 0) {
     trxSheet.appendRow(['borrowerId', 'fid', 'fname', 'serial_number', 'borrow_date', 'borrowTime', 'due_date', 'return_date', 'status', 'recorder', 'emailId', 'borrowNotes', 'accessories']);
   }
 
-  // 1. Calculate Dates
   const now = new Date();
   const timezone = "GMT+7";
   const borrowDate = Utilities.formatDate(now, timezone, "yyyy-MM-dd");
   const borrowTime = Utilities.formatDate(now, timezone, "HH:mm:ss");
   
+  // คำนวณวันกำหนดคืน
   let dueDate = new Date(now);
-  if (data.userGrade === 'ม.4') {
-    dueDate.setFullYear(dueDate.getFullYear() + 3);
-  } else if (data.userGrade === 'ม.5') {
-    dueDate.setFullYear(dueDate.getFullYear() + 2);
-  } else if (data.userGrade === 'ม.6') {
-    dueDate.setFullYear(dueDate.getFullYear() + 1);
-  } else if (data.userRole === 'Student') {
-    dueDate.setFullYear(dueDate.getFullYear() + 3); // Default for students if grade not specified
-  } else {
-    dueDate.setDate(dueDate.getDate() + 14); // Default 14 days for others
-  }
+  if (data.userGrade === 'ม.4') dueDate.setFullYear(dueDate.getFullYear() + 3);
+  else if (data.userGrade === 'ม.5') dueDate.setFullYear(dueDate.getFullYear() + 2);
+  else if (data.userGrade === 'ม.6') dueDate.setFullYear(dueDate.getFullYear() + 1);
+  else dueDate.setDate(dueDate.getDate() + 14);
+  
   const dueDateStr = Utilities.formatDate(dueDate, timezone, "yyyy-MM-dd");
   
-  // 2. Prepare Transaction Data
   const trxData = {
     borrowerId: 'TRX-' + Date.now(),
     fid: data.userFid,
@@ -315,91 +193,66 @@ function borrowDevice(data, user) {
     accessories: data.accessories || ""
   };
   
-  // 3. Append to Transactions
   const trxHeaders = trxSheet.getRange(1, 1, 1, trxSheet.getLastColumn()).getValues()[0];
-  const trxRow = trxHeaders.map(h => trxData[h] !== undefined ? trxData[h] : "");
-  trxSheet.appendRow(trxRow);
+  trxSheet.appendRow(trxHeaders.map(h => trxData[h] !== undefined ? trxData[h] : ""));
   
-  // 4. Update Device Status
+  // อัปเดตสถานะเครื่อง
   const devValues = devSheet.getDataRange().getValues();
-  const devHeaders = devValues[0];
-  const snIdx = devHeaders.indexOf('serial_number');
-  const statusIdx = devHeaders.indexOf('status');
-  const borrowedByIdx = devHeaders.indexOf('borrowedBy');
+  const snIdx = devValues[0].indexOf('serial_number');
+  const stIdx = devValues[0].indexOf('status');
+  const bByIdx = devValues[0].indexOf('borrowedBy');
   
   for (let i = 1; i < devValues.length; i++) {
     if (devValues[i][snIdx].toString() === data.serial_number.toString()) {
-      devSheet.getRange(i + 1, statusIdx + 1).setValue('Borrowed');
-      if (borrowedByIdx !== -1) {
-        devSheet.getRange(i + 1, borrowedByIdx + 1).setValue(data.userName);
-      }
+      devSheet.getRange(i + 1, stIdx + 1).setValue('Borrowed');
+      if (bByIdx !== -1) devSheet.getRange(i + 1, bByIdx + 1).setValue(data.userName);
       break;
     }
   }
   
-  logAction(user, 'BORROW', 'Transactions', JSON.stringify(trxData));
+  logAction(user, 'BORROW', 'Transactions', data.serial_number);
   return { success: true };
 }
 
 function returnDevice(data, user) {
   const trxSheet = SS.getSheetByName('Transactions');
   const devSheet = SS.getSheetByName('Devices');
-  
-  if (!trxSheet || !devSheet) throw new Error('Sheets not found');
+  const returnDate = Utilities.formatDate(new Date(), "GMT+7", "yyyy-MM-dd");
 
-  const now = new Date();
-  const timezone = "GMT+7";
-  const returnDate = Utilities.formatDate(now, timezone, "yyyy-MM-dd");
-
-  // 1. Update Transactions
+  // 1. อัปเดตรายการยืม
   const trxValues = trxSheet.getDataRange().getDisplayValues();
   const trxHeaders = trxValues[0];
-  const snIdx = trxHeaders.indexOf('serial_number') !== -1 ? trxHeaders.indexOf('serial_number') : trxHeaders.indexOf('snDevice');
-  const statusIdx = trxHeaders.indexOf('status');
-  const returnDateIdx = trxHeaders.indexOf('return_date');
+  const tSnIdx = trxHeaders.indexOf('serial_number') !== -1 ? trxHeaders.indexOf('serial_number') : trxHeaders.indexOf('snDevice');
+  const tStIdx = trxHeaders.indexOf('status');
+  const tRtIdx = trxHeaders.indexOf('return_date');
   
-  let foundTrx = false;
   for (let i = trxValues.length - 1; i >= 1; i--) {
-    if (trxValues[i][snIdx] === data.serial_number && trxValues[i][statusIdx] === 'Borrowed') {
-      if (returnDateIdx !== -1) {
-        trxSheet.getRange(i + 1, returnDateIdx + 1).setValue(returnDate);
-      }
-      trxSheet.getRange(i + 1, statusIdx + 1).setValue('Returned');
-      foundTrx = true;
+    if (trxValues[i][tSnIdx] === data.serial_number && trxValues[i][tStIdx] === 'Borrowed') {
+      if (tRtIdx !== -1) trxSheet.getRange(i + 1, tRtIdx + 1).setValue(returnDate);
+      trxSheet.getRange(i + 1, tStIdx + 1).setValue('Returned');
       break;
     }
   }
 
-  // 2. Update Devices
+  // 2. อัปเดตสถานะเครื่อง
   const devValues = devSheet.getDataRange().getValues();
-  const devHeaders = devValues[0];
-  const snIdx = devHeaders.indexOf('serial_number');
-  const devStatusIdx = devHeaders.indexOf('status');
-  const borrowedByIdx = devHeaders.indexOf('borrowedBy');
+  const dSnIdx = devValues[0].indexOf('serial_number');
+  const dStIdx = devValues[0].indexOf('status');
+  const bByIdx = devValues[0].indexOf('borrowedBy');
   
   for (let i = 1; i < devValues.length; i++) {
-    if (devValues[i][snIdx].toString() === data.serial_number.toString()) {
-      devSheet.getRange(i + 1, devStatusIdx + 1).setValue('Available');
-      if (borrowedByIdx !== -1) {
-        devSheet.getRange(i + 1, borrowedByIdx + 1).setValue('');
-      }
+    if (devValues[i][dSnIdx].toString() === data.serial_number.toString()) {
+      devSheet.getRange(i + 1, dStIdx + 1).setValue('Available');
+      if (bByIdx !== -1) devSheet.getRange(i + 1, bByIdx + 1).setValue('');
       break;
     }
   }
-
-  logAction(user, 'RETURN', 'Transactions', `Returned device ${data.serial_number} (Recorder: ${data.recorder || 'System'})`);
+  
+  logAction(user, 'RETURN', 'Transactions', data.serial_number);
   return { success: true };
 }
 
-function logAction(user, action, target, details) {
-  const sheet = SS.getSheetByName('Logs') || SS.insertSheet('Logs');
-  if (sheet.getLastRow() === 0) {
-    sheet.appendRow(['timestamp', 'user', 'action', 'target', 'details']);
-  }
-  const timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
-  const userName = user ? (user.fullName || user.username || user.email || user.users) : 'System';
-  sheet.appendRow([timestamp, userName, action, target, details]);
-}
+/** --- 3. ระบบแจ้งซ่อมและอัปโหลดรูป (Service/Upload) --- **/
 
 function reportService(data, user) {
   const sheet = SS.getSheetByName('Service') || SS.insertSheet('Service');
@@ -408,23 +261,102 @@ function reportService(data, user) {
   }
   
   const id = 'SRV-' + Date.now();
-  const reportedAt = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
+  let photoUrl = data.photo_url || "";
   
+  // ตรวจสอบว่าเป็น Base64 Image หรือไม่
+  if (photoUrl.startsWith('data:image')) {
+    photoUrl = uploadImageToDrive(photoUrl, `service_${id}.png`);
+  }
+
   const rowData = {
-    id: id,
-    deviceId: data.deviceId,
+    id: id, 
+    deviceId: data.deviceId, 
     issue_type: data.issue_type,
-    details: data.details,
+    details: data.details, 
     email: data.email || (user ? user.email : ""),
-    photo_url: data.photo_url || "",
-    reportedAt: reportedAt,
+    photo_url: photoUrl, 
+    reportedAt: Utilities.formatDate(new Date(), "GMT+7", "yyyy-MM-dd HH:mm:ss"),
     status: 'Pending'
   };
-  
+
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  const row = headers.map(h => rowData[h] !== undefined ? rowData[h] : "");
-  sheet.appendRow(row);
+  sheet.appendRow(headers.map(h => rowData[h] !== undefined ? rowData[h] : ""));
   
   logAction(user, 'REPORT_SERVICE', 'Service', JSON.stringify(rowData));
-  return { success: true, id: id };
+  return { success: true, id: id, imageUrl: photoUrl };
+}
+
+function uploadImageToDrive(base64, name) {
+  try {
+    const folder = DriveApp.getFolderById(CONFIG.UPLOAD_FOLDER_ID);
+    const split = base64.split(',');
+    const type = split[0].match(/:(.*?);/)[1];
+    const blob = Utilities.newBlob(Utilities.base64Decode(split[1]), type, name);
+    const file = folder.createFile(blob);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    return file.getUrl();
+  } catch (e) { 
+    return "error: " + e.toString(); 
+  }
+}
+
+/** --- 4. ระบบจัดการการนำเข้าข้อมูล (Import) --- **/
+
+function importTransactions(data, user) {
+  const sheet = SS.getSheetByName('Transactions') || SS.insertSheet('Transactions');
+  const devSheet = SS.getSheetByName('Devices');
+  
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(['borrowerId', 'fid', 'fname', 'serial_number', 'borrow_date', 'borrowTime', 'due_date', 'return_date', 'status', 'recorder', 'emailId', 'borrowNotes', 'accessories']);
+  }
+  
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const devValues = devSheet.getDataRange().getValues();
+  const devSerialIdx = devValues[0].indexOf('serial_number');
+  const devStatusIdx = devValues[0].indexOf('status');
+
+  let successCount = 0;
+  let failCount = 0;
+  let errors = [];
+
+  data.forEach((item, index) => {
+    try {
+      if (!item.borrowerId) item.borrowerId = 'TRX-' + Date.now() + '-' + index;
+      if (!item.emailId) item.emailId = "ยังไม่ระบุ";
+      if (!item.borrowNotes) item.borrowNotes = "ยังไม่ระบุ";
+      
+      const row = headers.map(h => item[h] !== undefined ? item[h] : "");
+      sheet.appendRow(row);
+
+      const sn = item.serial_number || item.snDevice;
+      if (sn && item.status) {
+        for (let i = 1; i < devValues.length; i++) {
+          if (devValues[i][devSerialIdx].toString() === sn.toString()) {
+            const newStatus = item.status === 'Borrowed' ? 'Borrowed' : 'Available';
+            devSheet.getRange(i + 1, devStatusIdx + 1).setValue(newStatus);
+            break;
+          }
+        }
+      }
+      successCount++;
+    } catch (e) {
+      failCount++;
+      errors.push(`Row ${index + 1}: ${e.message}`);
+    }
+  });
+  
+  logAction(user, 'IMPORT', 'Transactions', `Imported ${data.length} items`);
+  return { success: true, successCount, failCount, errors };
+}
+
+/** --- 5. ฟังก์ชันเสริม --- **/
+
+function logAction(user, action, target, details) {
+  const sheet = SS.getSheetByName('Logs') || SS.insertSheet('Logs');
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(['timestamp', 'user', 'action', 'target', 'details']);
+  }
+  const ts = Utilities.formatDate(new Date(), "GMT+7", "yyyy-MM-dd HH:mm:ss");
+  const name = user ? (user.fullName || user.name || user.users || user.email) : 'System';
+  sheet.appendRow([ts, name, action, target, details]);
 }

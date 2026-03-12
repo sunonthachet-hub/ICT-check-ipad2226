@@ -23,6 +23,23 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ devices, categories, onUpdate, 
   const [editingItem, setEditingItem] = useState<Device | Category | ServiceLog | User | Teacher | Student | null>(null);
   const [studentGradeFilter, setStudentGradeFilter] = useState<string>('all');
   const [studentSearchTerm, setStudentSearchTerm] = useState<string>('');
+  const [debouncedStudentSearch, setDebouncedStudentSearch] = useState<string>('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 20;
+
+  // Debounce student search
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedStudentSearch(studentSearchTerm);
+      setCurrentPage(1); // Reset to first page on search
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [studentSearchTerm]);
+
+  // Reset page on tab change
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [activeSubTab, studentGradeFilter]);
 
   const handleDelete = async (type: string, id: string, item?: any) => {
     if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการลบรายการนี้?')) return;
@@ -34,7 +51,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ devices, categories, onUpdate, 
     }
     if (type === 'ServiceLog') sheetName = 'serviceLogs';
 
-    const result = await gasHelper('delete', sheetName, { id });
+    const result = await gasHelper('delete', sheetName, type === 'Devices' ? { serial_number: id } : { id });
     if (result.success) {
       alert('ลบข้อมูลสำเร็จ');
       onUpdate();
@@ -155,6 +172,40 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ devices, categories, onUpdate, 
           </button>
         </div>
 
+        {/* Pagination Info */}
+        <div className="px-6 py-2 bg-gray-50 border-y border-gray-100 flex justify-between items-center text-[10px] text-gray-500 font-bold uppercase tracking-wider">
+          <span>แสดงรายการที่ {(currentPage - 1) * pageSize + 1} - {Math.min(currentPage * pageSize, 
+            activeSubTab === 'inventory' ? devices.length :
+            activeSubTab === 'categories' ? categories.length :
+            activeSubTab === 'users' ? (devices.users?.length || 0) :
+            activeSubTab === 'teachers' ? (devices.teachers?.length || 0) :
+            activeSubTab === 'students' ? (devices.students?.filter(s => (studentGradeFilter === 'all' || s.grade === studentGradeFilter) && (s.fullName.toLowerCase().includes(debouncedStudentSearch.toLowerCase()) || s.studentId.toString().includes(debouncedStudentSearch))).length || 0) :
+            activeSubTab === 'serviceLogs' ? (devices.serviceLogs?.length || 0) :
+            (devices.serviceReports?.length || 0)
+          )}</span>
+          <div className="flex gap-2">
+            <button 
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              className="px-2 py-1 rounded border border-gray-200 hover:bg-white disabled:opacity-30 cursor-pointer"
+            >Prev</button>
+            <span className="flex items-center px-2">Page {currentPage}</span>
+            <button 
+              disabled={currentPage * pageSize >= (
+                activeSubTab === 'inventory' ? devices.length :
+                activeSubTab === 'categories' ? categories.length :
+                activeSubTab === 'users' ? (devices.users?.length || 0) :
+                activeSubTab === 'teachers' ? (devices.teachers?.length || 0) :
+                activeSubTab === 'students' ? (devices.students?.filter(s => (studentGradeFilter === 'all' || s.grade === studentGradeFilter) && (s.fullName.toLowerCase().includes(debouncedStudentSearch.toLowerCase()) || s.studentId.toString().includes(debouncedStudentSearch))).length || 0) :
+                activeSubTab === 'serviceLogs' ? (devices.serviceLogs?.length || 0) :
+                (devices.serviceReports?.length || 0)
+              )}
+              onClick={() => setCurrentPage(prev => prev + 1)}
+              className="px-2 py-1 rounded border border-gray-200 hover:bg-white disabled:opacity-30 cursor-pointer"
+            >Next</button>
+          </div>
+        </div>
+
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -166,7 +217,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ devices, categories, onUpdate, 
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {activeSubTab === 'inventory' && devices.map((device) => (
+              {activeSubTab === 'inventory' && devices.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((device) => (
                 <tr key={device.serial_number} className="hover:bg-spk-gray/30 transition-colors group">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
@@ -197,7 +248,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ devices, categories, onUpdate, 
                 </tr>
               ))}
               
-              {activeSubTab === 'categories' && categories.map((cat) => (
+              {activeSubTab === 'categories' && categories.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((cat) => (
                 <tr key={cat.id} className="hover:bg-spk-gray/30 transition-colors group">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
@@ -222,7 +273,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ devices, categories, onUpdate, 
                 </tr>
               ))}
 
-              {activeSubTab === 'serviceLogs' && devices.serviceLogs?.map((m) => (
+              {activeSubTab === 'serviceLogs' && devices.serviceLogs?.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((m) => (
                 <tr key={m.id} className="hover:bg-spk-gray/30 transition-colors group">
                   <td className="px-6 py-4">
                     <p className="font-bold text-gray-800">{m.issue}</p>
@@ -244,7 +295,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ devices, categories, onUpdate, 
                   </td>
                 </tr>
               ))}
-              {activeSubTab === 'users' && devices.users?.map((user) => (
+              {activeSubTab === 'users' && devices.users?.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((user) => (
                 <tr key={user.users} className="hover:bg-spk-gray/30 transition-colors group">
                   <td className="px-6 py-4">
                     <p className="font-bold text-gray-800">{user.name}</p>
@@ -264,7 +315,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ devices, categories, onUpdate, 
                   </td>
                 </tr>
               ))}
-              {activeSubTab === 'teachers' && devices.teachers?.map((teacher) => (
+              {activeSubTab === 'teachers' && devices.teachers?.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((teacher) => (
                 <tr key={teacher.id} className="hover:bg-spk-gray/30 transition-colors group">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
@@ -300,10 +351,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ devices, categories, onUpdate, 
               ))}
               {activeSubTab === 'students' && devices.students?.filter(s => {
                 const matchesGrade = studentGradeFilter === 'all' || s.grade === studentGradeFilter;
-                const matchesSearch = s.fullName.toLowerCase().includes(studentSearchTerm.toLowerCase()) || 
-                                    s.studentId.toString().includes(studentSearchTerm);
+                const matchesSearch = s.fullName.toLowerCase().includes(debouncedStudentSearch.toLowerCase()) || 
+                                    s.studentId.toString().includes(debouncedStudentSearch);
                 return matchesGrade && matchesSearch;
-              }).map((student) => (
+              }).slice((currentPage - 1) * pageSize, currentPage * pageSize).map((student) => (
                 <tr key={student.studentId} className="hover:bg-spk-gray/30 transition-colors group">
                   <td className="px-6 py-4">
                     <p className="font-bold text-gray-800">{student.fullName}</p>
@@ -328,7 +379,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ devices, categories, onUpdate, 
                   </td>
                 </tr>
               ))}
-              {activeSubTab === 'service' && devices.serviceReports?.map((report) => (
+              {activeSubTab === 'service' && devices.serviceReports?.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((report) => (
                 <tr key={report.id} className="hover:bg-spk-gray/30 transition-colors group">
                   <td className="px-6 py-4">
                     <p className="font-bold text-gray-800">{report.issue_type}</p>
@@ -384,7 +435,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ devices, categories, onUpdate, 
                   data.id = (editingItem as any).id || (editingItem as any).studentId || (editingItem as any).users || (editingItem as any).serial_number;
                   if (activeSubTab === 'students') data.studentId = (editingItem as any).studentId;
                   if (activeSubTab === 'users') data.users = (editingItem as any).users;
-                  if (activeSubTab === 'inventory') data.id = (editingItem as Device).serial_number;
+                  if (activeSubTab === 'inventory') {
+                    data.serial_number = (editingItem as Device).serial_number;
+                    data.id = data.serial_number;
+                  }
                 }
 
                 const action = editingItem ? 'update' : 'append';

@@ -14,8 +14,20 @@ const Service: React.FC<ServiceProps> = ({ devices, currentUser, t }) => {
   const [issueType, setIssueType] = useState('Hardware');
   const [details, setDetails] = useState('');
   const [email, setEmail] = useState(currentUser.email || '');
+  const [photoBase64, setPhotoBase64] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPhotoBase64(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,13 +42,14 @@ const Service: React.FC<ServiceProps> = ({ devices, currentUser, t }) => {
         issue_type: issueType,
         details,
         email,
-        photo_url: '' // Placeholder for now
+        photo_url: photoBase64
       }, currentUser);
 
       if (res.success) {
         setMessage({ type: 'success', text: 'ส่งข้อมูลการแจ้งซ่อมเรียบร้อยแล้ว' });
         setSelectedDeviceId('');
         setDetails('');
+        setPhotoBase64('');
       } else {
         setMessage({ type: 'error', text: res.message || 'เกิดข้อผิดพลาดในการส่งข้อมูล' });
       }
@@ -119,9 +132,35 @@ const Service: React.FC<ServiceProps> = ({ devices, currentUser, t }) => {
                 />
               </div>
 
-              <div className="p-4 bg-gray-50 rounded-2xl border border-dashed border-gray-300 flex flex-col items-center justify-center gap-2 text-gray-400 hover:text-spk-blue hover:border-spk-blue transition-all cursor-pointer">
-                <Camera className="w-8 h-8" />
-                <span className="text-sm font-bold">แนบรูปภาพประกอบ (ถ้ามี)</span>
+              <div>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageChange}
+                  className="hidden"
+                  id="photo-upload"
+                />
+                <label
+                  htmlFor="photo-upload"
+                  className={`p-6 rounded-2xl border-2 border-dashed transition-all cursor-pointer flex flex-col items-center justify-center gap-3 ${photoBase64 ? 'bg-spk-blue/5 border-spk-blue text-spk-blue' : 'bg-gray-50 border-gray-200 text-gray-400 hover:text-spk-blue hover:border-spk-blue'}`}
+                >
+                  {photoBase64 ? (
+                    <div className="relative w-full max-w-[200px] aspect-video rounded-lg overflow-hidden shadow-md">
+                      <img src={photoBase64} alt="Preview" className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                        <Camera className="w-6 h-6 text-white" />
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <Camera className="w-10 h-10" />
+                      <div className="text-center">
+                        <p className="font-bold">แนบรูปภาพประกอบ</p>
+                        <p className="text-xs opacity-60">คลิกเพื่อเลือกรูปภาพ (ถ้ามี)</p>
+                      </div>
+                    </>
+                  )}
+                </label>
               </div>
 
               {message && (

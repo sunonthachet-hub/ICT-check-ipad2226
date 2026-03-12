@@ -11,15 +11,38 @@ interface StudentsRegistryProps {
 const StudentsRegistry: React.FC<StudentsRegistryProps> = ({ students, teachers, t }) => {
   const [gradeFilter, setGradeFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [debouncedSearch, setDebouncedSearch] = useState<string>('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 20;
 
-  const filteredStudents = students.filter(s => {
-    const matchesGrade = gradeFilter === 'all' || s.grade === gradeFilter;
-    const matchesSearch = 
-      s.fullName.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      s.studentId.toString().includes(searchTerm) ||
-      (s.classroom && s.classroom.toString().includes(searchTerm));
-    return matchesGrade && matchesSearch;
-  });
+  // Debounce search
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setCurrentPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Reset page on filter change
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [gradeFilter]);
+
+  const filteredStudents = React.useMemo(() => {
+    return students.filter(s => {
+      const matchesGrade = gradeFilter === 'all' || s.grade === gradeFilter;
+      const matchesSearch = 
+        s.fullName.toLowerCase().includes(debouncedSearch.toLowerCase()) || 
+        s.studentId.toString().includes(debouncedSearch) ||
+        (s.classroom && s.classroom.toString().includes(debouncedSearch));
+      return matchesGrade && matchesSearch;
+    });
+  }, [students, gradeFilter, debouncedSearch]);
+
+  const paginatedStudents = React.useMemo(() => {
+    return filteredStudents.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  }, [filteredStudents, currentPage, pageSize]);
 
   const getTeacherForClassroom = (grade: string, classroom: string) => {
     const classKey = `${grade}/${classroom}`;
@@ -75,7 +98,7 @@ const StudentsRegistry: React.FC<StudentsRegistryProps> = ({ students, teachers,
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {filteredStudents.map((student) => {
+              {paginatedStudents.map((student) => {
                 const teacher = getTeacherForClassroom(student.grade, student.classroom);
                 return (
                   <tr key={student.studentId} className="hover:bg-spk-gray/30 transition-colors group">
@@ -125,7 +148,7 @@ const StudentsRegistry: React.FC<StudentsRegistryProps> = ({ students, teachers,
                   </tr>
                 );
               })}
-              {filteredStudents.length === 0 && (
+              {paginatedStudents.length === 0 && (
                 <tr>
                   <td colSpan={5} className="px-6 py-12 text-center text-gray-400">
                     <div className="flex flex-col items-center gap-2">
@@ -139,8 +162,25 @@ const StudentsRegistry: React.FC<StudentsRegistryProps> = ({ students, teachers,
           </table>
         </div>
         
-        <div className="mt-4 text-right">
-          <p className="text-xs text-gray-400">แสดงข้อมูลทั้งหมด {filteredStudents.length} รายการ</p>
+        <div className="mt-6 flex flex-col md:flex-row justify-between items-center gap-4 pt-6 border-t border-gray-50">
+          <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">
+            แสดงรายการที่ {(currentPage - 1) * pageSize + 1} - {Math.min(currentPage * pageSize, filteredStudents.length)} จาก {filteredStudents.length}
+          </p>
+          <div className="flex gap-2">
+            <button 
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              className="px-4 py-2 rounded-xl border border-gray-200 text-sm font-bold text-gray-600 hover:bg-spk-gray disabled:opacity-30 cursor-pointer transition-all"
+            >ก่อนหน้า</button>
+            <div className="flex items-center px-4 bg-spk-gray rounded-xl text-sm font-bold text-spk-blue">
+              หน้า {currentPage}
+            </div>
+            <button 
+              disabled={currentPage * pageSize >= filteredStudents.length}
+              onClick={() => setCurrentPage(prev => prev + 1)}
+              className="px-4 py-2 rounded-xl border border-gray-200 text-sm font-bold text-gray-600 hover:bg-spk-gray disabled:opacity-30 cursor-pointer transition-all"
+            >ถัดไป</button>
+          </div>
         </div>
       </div>
     </div>

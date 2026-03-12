@@ -25,6 +25,11 @@ const App: React.FC = () => {
   
   const [devices, setDevices] = useState<Device[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [serviceLogs, setServiceLogs] = useState<ServiceLog[]>([]);
+  const [serviceReports, setServiceReports] = useState<ServiceReport[]>([]);
   const [stats, setStats] = useState({
     total: 0,
     available: 0,
@@ -37,6 +42,7 @@ const App: React.FC = () => {
   }, [language]);
 
   const loadPublicData = useCallback(async () => {
+    setIsLoading(true);
     try {
       const [devicesRes, categoriesRes] = await Promise.all([
         gasHelper('read', 'Devices'),
@@ -57,64 +63,7 @@ const App: React.FC = () => {
         });
         setCategories(loadedCategories);
         setDevices(loadedDevices);
-      }
-    } catch (error) {
-      console.error('Failed to load public data', error);
-    }
-  }, []);
-
-  const loadData = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const [devicesRes, categoriesRes, usersRes, serviceLogsRes, studentsRes, studentsM5Res, studentsM6Res, serviceRes, teachersRes] = await Promise.all([
-        gasHelper('read', 'Devices'),
-        gasHelper('read', 'Categories'),
-        gasHelper('read', 'Users'),
-        gasHelper('read', 'serviceLogs'),
-        gasHelper('read', 'Students'),
-        gasHelper('read', 'StudentsM5'),
-        gasHelper('read', 'StudentsM6'),
-        gasHelper('read', 'Service'),
-        gasHelper('read', 'Teachers')
-      ]);
-
-      if (devicesRes.success && categoriesRes.success) {
-        const loadedCategories = categoriesRes.data as Category[];
-        const loadedDevices = (devicesRes.data as Device[]).map(d => {
-          const cat = loadedCategories.find(c => c.id === d.category_id);
-          return {
-            ...d,
-            name: cat?.name || 'Unknown Device',
-            categoryName: cat?.name,
-            imageUrl: cat?.imageUrl,
-            designatedFor: cat?.designatedFor
-          };
-        });
-
-        const extendedDevices = loadedDevices as Device[] & {
-          users?: User[];
-          serviceLogs?: ServiceLog[];
-          students?: Student[];
-          serviceReports?: ServiceReport[];
-          teachers?: Teacher[];
-        };
-
-        extendedDevices.users = usersRes.data as User[];
-        extendedDevices.serviceLogs = serviceLogsRes.data as ServiceLog[];
-        extendedDevices.teachers = teachersRes.data as Teacher[];
         
-        // Combine all student data
-        const allStudents = [
-          ...(studentsRes.data as Student[] || []),
-          ...(studentsM5Res.data as Student[] || []),
-          ...(studentsM6Res.data as Student[] || [])
-        ];
-        extendedDevices.students = allStudents;
-        extendedDevices.serviceReports = serviceRes.data as ServiceReport[];
-
-        setCategories(loadedCategories);
-        setDevices(extendedDevices);
-
         // Calculate stats
         setStats({
           total: loadedDevices.length,
@@ -124,11 +73,67 @@ const App: React.FC = () => {
         });
       }
     } catch (error) {
-      console.error('Failed to load data', error);
+      console.error('Failed to load public data', error);
     } finally {
       setIsLoading(false);
     }
   }, []);
+
+  const loadExtendedData = useCallback(async () => {
+    if (!currentUser) return;
+    
+    try {
+      const [usersRes, serviceLogsRes, serviceRes] = await Promise.all([
+        gasHelper('read', 'Users'),
+        gasHelper('read', 'serviceLogs'),
+        gasHelper('read', 'Service')
+      ]);
+
+      if (usersRes.success) setUsers(usersRes.data as User[]);
+      if (serviceLogsRes.success) setServiceLogs(serviceLogsRes.data as ServiceLog[]);
+      if (serviceRes.success) setServiceReports(serviceRes.data as ServiceReport[]);
+    } catch (error) {
+      console.error('Failed to load extended data', error);
+    }
+  }, [currentUser]);
+
+  const normalizeGrade = (grade: any): string => {
+    const g = String(grade).trim();
+    if (!g) return '';
+    if (g.startsWith('ม.')) return g;
+    if (/^\d+$/.test(g)) return `ม.${g}`;
+    return g;
+  };
+
+  const loadStudentsData = useCallback(async () => {
+    if (!currentUser || students.length > 0) return;
+    
+    setIsLoading(true);
+    try {
+      const [studentsRes, studentsM5Res, studentsM6Res, teachersRes] = await Promise.all([
+        gasHelper('read', 'Students'),
+        gasHelper('read', 'StudentsM5'),
+        gasHelper('read', 'StudentsM6'),
+        gasHelper('read', 'Teachers')
+      ]);
+
+      const allStudents = [
+        ...(studentsRes.data as Student[] || []),
+        ...(studentsM5Res.data as Student[] || []),
+        ...(studentsM6Res.data as Student[] || [])
+      ].map(s => ({
+        ...s,
+        grade: normalizeGrade(s.grade)
+      }));
+
+      setStudents(allStudents);
+      if (teachersRes.success) setTeachers(teachersRes.data as Teacher[]);
+    } catch (error) {
+      console.error('Failed to load students data', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [currentUser, students.length]);
 
   useEffect(() => {
     const checkDb = async () => {
@@ -141,13 +146,19 @@ const App: React.FC = () => {
     };
     checkDb();
     loadPublicData();
+  }, [loadPublicData]);
 
+  useEffect(() => {
     if (currentUser) {
-      loadData();
-    } else {
-      setIsLoading(false);
+      loadExtendedData();
     }
-  }, [currentUser, loadData, loadPublicData]);
+  }, [currentUser, loadExtendedData]);
+
+  useEffect(() => {
+    if (currentUser && (activeTab === 'borrow' || activeTab === 'students' || activeTab === 'admin')) {
+      loadStudentsData();
+    }
+  }, [currentUser, activeTab, loadStudentsData]);
 
   const handleLogin = (user: User) => {
     setCurrentUser(user);
@@ -182,22 +193,35 @@ const App: React.FC = () => {
   }
 
   const renderContent = () => {
+    const extendedDevices = [...devices] as Device[] & {
+      users?: User[];
+      serviceLogs?: ServiceLog[];
+      students?: Student[];
+      serviceReports?: ServiceReport[];
+      teachers?: Teacher[];
+    };
+    extendedDevices.users = users;
+    extendedDevices.serviceLogs = serviceLogs;
+    extendedDevices.students = students;
+    extendedDevices.serviceReports = serviceReports;
+    extendedDevices.teachers = teachers;
+
     switch (activeTab) {
       case 'dashboard':
         return <Dashboard stats={stats} t={t} />;
       case 'inventory':
         return <Inventory devices={devices} categories={categories} t={t} />;
       case 'borrow':
-        return <BorrowReturn devices={devices} currentUser={currentUser} onUpdate={loadData} t={t} />;
+        return <BorrowReturn devices={extendedDevices} currentUser={currentUser} onUpdate={loadPublicData} t={t} />;
       case 'service':
-        return <Service devices={devices} currentUser={currentUser} t={t} />;
+        return <Service devices={extendedDevices} currentUser={currentUser} t={t} />;
       case 'students':
-        return <StudentsRegistry students={(devices as any).students || []} teachers={(devices as any).teachers || []} t={t} />;
+        return <StudentsRegistry students={students} teachers={teachers} t={t} />;
       case 'logs':
         return <Logs t={t} />;
       case 'admin':
         return (currentUser.role === UserRole.Admin || currentUser.role === UserRole.Staff) ? (
-          <AdminPanel devices={devices} categories={categories} onUpdate={loadData} t={t} />
+          <AdminPanel devices={extendedDevices} categories={categories} onUpdate={loadPublicData} t={t} />
         ) : (
           <Dashboard stats={stats} t={t} />
         );

@@ -14,6 +14,8 @@ const Inventory: React.FC<InventoryProps> = ({ devices, t }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [selectedStatus, setSelectedStatus] = useState<string>('All');
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 20;
 
   const categoryOptions = useMemo(() => {
     const cats = new Set(devices.map(d => d.categoryName).filter(Boolean));
@@ -24,8 +26,7 @@ const Inventory: React.FC<InventoryProps> = ({ devices, t }) => {
     return devices.filter(device => {
       const matchesSearch = 
         device.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        device.serial_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        device.id?.toString().toLowerCase().includes(searchTerm.toLowerCase());
+        device.serial_number?.toLowerCase().includes(searchTerm.toLowerCase());
       
       const matchesCategory = selectedCategory === 'All' || device.categoryName === selectedCategory;
       const matchesStatus = selectedStatus === 'All' || device.status === selectedStatus;
@@ -33,6 +34,15 @@ const Inventory: React.FC<InventoryProps> = ({ devices, t }) => {
       return matchesSearch && matchesCategory && matchesStatus;
     });
   }, [devices, searchTerm, selectedCategory, selectedStatus]);
+
+  const paginatedDevices = useMemo(() => {
+    return filteredDevices.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  }, [filteredDevices, currentPage, pageSize]);
+
+  // Reset page on filter change
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedCategory, selectedStatus]);
 
   const getStatusBadge = (status: DeviceStatus) => {
     switch (status) {
@@ -99,13 +109,31 @@ const Inventory: React.FC<InventoryProps> = ({ devices, t }) => {
         </div>
       </div>
 
+      {/* Pagination Info */}
+      <div className="flex justify-between items-center px-6 py-3 bg-white rounded-xl shadow-sm border border-gray-100 text-[10px] text-gray-500 font-bold uppercase tracking-wider">
+        <span>แสดงรายการที่ {(currentPage - 1) * pageSize + 1} - {Math.min(currentPage * pageSize, filteredDevices.length)} จาก {filteredDevices.length}</span>
+        <div className="flex gap-2">
+          <button 
+            disabled={currentPage === 1}
+            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+            className="px-3 py-1 rounded-lg border border-gray-200 hover:bg-spk-gray disabled:opacity-30 cursor-pointer transition-colors"
+          >ก่อนหน้า</button>
+          <span className="flex items-center px-2">หน้า {currentPage}</span>
+          <button 
+            disabled={currentPage * pageSize >= filteredDevices.length}
+            onClick={() => setCurrentPage(prev => prev + 1)}
+            className="px-3 py-1 rounded-lg border border-gray-200 hover:bg-spk-gray disabled:opacity-30 cursor-pointer transition-colors"
+          >ถัดไป</button>
+        </div>
+      </div>
+
       {/* Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <AnimatePresence mode="popLayout">
-          {filteredDevices.map((device) => (
+          {paginatedDevices.map((device) => (
             <motion.div
               layout
-              key={device.id}
+              key={device.serial_number}
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
@@ -113,12 +141,9 @@ const Inventory: React.FC<InventoryProps> = ({ devices, t }) => {
               className="card p-0 overflow-hidden hover:shadow-lg transition-shadow group border-l-4 border-l-transparent hover:border-l-spk-blue"
             >
               <div className="relative h-48 bg-gray-100 overflow-hidden">
-                <img 
-                  src={device.imageUrl || `https://picsum.photos/seed/${device.id}/400/300`} 
-                  alt={device.name} 
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  referrerPolicy="no-referrer"
-                />
+                <div className="w-full h-full flex items-center justify-center bg-gray-50">
+                  <Package className="w-16 h-16 text-gray-200" />
+                </div>
                 <div className="absolute top-3 right-3">
                   {getStatusBadge(device.status)}
                 </div>
@@ -136,9 +161,9 @@ const Inventory: React.FC<InventoryProps> = ({ devices, t }) => {
                   <div className="space-y-1">
                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1">
                       <Hash className="w-3 h-3" />
-                      Asset ID
+                      Serial Number
                     </p>
-                    <p className="text-sm font-mono font-bold text-spk-blue">{device.id}</p>
+                    <p className="text-sm font-mono font-bold text-spk-blue truncate">{device.serial_number}</p>
                   </div>
                   <div className="space-y-1">
                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1">

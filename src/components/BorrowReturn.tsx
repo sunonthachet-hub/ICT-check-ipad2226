@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Device, User, DeviceStatus, TranslationKey, Student } from '../types';
 import { Search, RefreshCw, ArrowRightLeft, CheckCircle, Info as InfoIcon, Hash, User as UserIcon, Laptop, CheckSquare, Square, Package } from 'lucide-react';
 import { gasHelper } from '../services/gasService';
@@ -18,9 +18,27 @@ const BorrowReturn: React.FC<BorrowReturnProps> = ({ devices, currentUser, onUpd
   
   // Borrow Workflow States
   const [studentSearch, setStudentSearch] = useState('');
+  const [debouncedStudentSearch, setDebouncedStudentSearch] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [deviceSearch, setDeviceSearch] = useState('');
+  const [debouncedDeviceSearch, setDebouncedDeviceSearch] = useState('');
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
+
+  // Debounce effect for student search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedStudentSearch(studentSearch);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [studentSearch]);
+
+  // Debounce effect for device search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedDeviceSearch(deviceSearch);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [deviceSearch]);
   
   // Form States
   const [email, setEmail] = useState('');
@@ -35,31 +53,35 @@ const BorrowReturn: React.FC<BorrowReturnProps> = ({ devices, currentUser, onUpd
   const students = devices.students || [];
 
   const filteredStudents = useMemo(() => {
-    if (!studentSearch || selectedStudent) return [];
+    if (!debouncedStudentSearch || selectedStudent) return [];
+    const search = debouncedStudentSearch.toLowerCase();
     return students.filter(s => 
-      s.fullName.toLowerCase().includes(studentSearch.toLowerCase()) ||
-      s.studentId.toString().includes(studentSearch)
-    ).slice(0, 5);
-  }, [students, studentSearch, selectedStudent]);
+      s.fullName.toLowerCase().includes(search) ||
+      s.studentId.toString().includes(search)
+    ).slice(0, 20); // Limit to 20 results
+  }, [students, debouncedStudentSearch, selectedStudent]);
 
   const filteredDevices = useMemo(() => {
     if (mode === 'return') {
+      if (!debouncedDeviceSearch) return []; // Don't show all devices initially in return mode
+      const search = debouncedDeviceSearch.toLowerCase();
       return devices.filter(d => 
         d.status === DeviceStatus.Borrowed && (
-          d.name?.toLowerCase().includes(deviceSearch.toLowerCase()) ||
-          d.serial_number?.toLowerCase().includes(deviceSearch.toLowerCase())
+          d.name?.toLowerCase().includes(search) ||
+          d.serial_number?.toLowerCase().includes(search)
         )
-      );
+      ).slice(0, 20); // Limit to 20 results
     }
     
-    if (!deviceSearch || selectedDevice) return [];
+    if (!debouncedDeviceSearch || selectedDevice) return [];
+    const search = debouncedDeviceSearch.toLowerCase();
     return devices.filter(d => 
       d.status === DeviceStatus.Available && (
-        d.name?.toLowerCase().includes(deviceSearch.toLowerCase()) ||
-        d.serial_number?.toLowerCase().includes(deviceSearch.toLowerCase())
+        d.name?.toLowerCase().includes(search) ||
+        d.serial_number?.toLowerCase().includes(search)
       )
-    ).slice(0, 5);
-  }, [devices, deviceSearch, selectedDevice, mode]);
+    ).slice(0, 20); // Limit to 20 results
+  }, [devices, debouncedDeviceSearch, selectedDevice, mode]);
 
   const calculateDueDate = (grade: string) => {
     const now = new Date();
@@ -82,12 +104,11 @@ const BorrowReturn: React.FC<BorrowReturnProps> = ({ devices, currentUser, onUpd
     setIsLoading(true);
     try {
       const result = await gasHelper('borrowDevice', null, {
-        deviceId: selectedDevice.serial_number,
+        serial_number: selectedDevice.serial_number,
         userFid: selectedStudent.studentId,
         userName: selectedStudent.fullName,
         userGrade: selectedStudent.grade,
         userClassroom: selectedStudent.classroom,
-        serial_number: selectedDevice.serial_number,
         userRole: 'Student',
         emailId: email || selectedStudent.email,
         borrowNotes: notes,
@@ -115,7 +136,6 @@ const BorrowReturn: React.FC<BorrowReturnProps> = ({ devices, currentUser, onUpd
     setIsLoading(true);
     try {
       const result = await gasHelper('returnDevice', null, {
-        deviceId: device.serial_number,
         serial_number: device.serial_number,
         recorder: currentUser.name
       });
