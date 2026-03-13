@@ -1,12 +1,11 @@
 export const gasHelper = async (action: string, sheetName: string | null, data?: any, currentUser?: any): Promise<any> => {
-  // Support both GAS_URL (from Secrets) and VITE_GAS_URL (from .env)
-  const GAS_URL = (process.env as any).GAS_URL || import.meta.env.VITE_GAS_URL;
+  const GAS_URL = import.meta.env.VITE_GAS_URL;
   
-  if (!GAS_URL || GAS_URL.includes('XXXXXXXXX')) {
-    console.error('❌ GAS_URL is not defined or invalid.');
+  if (!GAS_URL || GAS_URL === "" || GAS_URL.includes('XXXXXXXXX')) {
+    console.error('❌ VITE_GAS_URL is missing or placeholder.');
     return { 
       success: false, 
-      error: 'ระบบยังไม่ได้เชื่อมต่อกับ Google Sheets (GAS_URL missing). กรุณาตั้งค่าใน Settings > Secrets' 
+      error: 'ระบบยังไม่ได้เชื่อมต่อกับ Google Sheets (VITE_GAS_URL missing). กรุณาตรวจสอบว่าได้ตั้งค่า "VITE_GAS_URL" ใน Settings > Secrets และกด Restart Server' 
     };
   }
 

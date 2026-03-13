@@ -8,8 +8,8 @@ export default defineConfig(({mode}) => {
   return {
     plugins: [react(), tailwindcss()],
     define: {
-      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-      'process.env.GAS_URL': JSON.stringify(env.GAS_URL),
+      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY || process.env.GEMINI_API_KEY || ""),
+      'import.meta.env.VITE_GAS_URL': JSON.stringify(env.VITE_GAS_URL || env.GAS_URL || process.env.GAS_URL || process.env.VITE_GAS_URL || ""),
     },
     resolve: {
       alias: {
