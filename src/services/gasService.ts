@@ -1,34 +1,37 @@
 export const gasHelper = async (action: string, sheetName: string | null, data?: any, currentUser?: any): Promise<any> => {
-  const GAS_URL = import.meta.env.VITE_GAS_URL;
+  // Use process.env.GAS_URL as defined in vite.config.ts
+  const GAS_URL = (process.env as any).GAS_URL;
   
   if (!GAS_URL) {
-    console.warn('VITE_GAS_URL is not defined. Using mock data.');
-    if (action === 'login') {
-      return { success: true, user: { id: '1', users: 'admin', role: 'Admin', name: 'Admin User' } };
-    }
-    return { success: true, data: [] };
+    console.error('GAS_URL is not defined in environment variables.');
+    return { 
+      success: false, 
+      error: 'ระบบยังไม่ได้เชื่อมต่อกับ Google Sheets (GAS_URL missing). กรุณาตั้งค่าใน Environment Variables.' 
+    };
   }
 
   try {
     const response = await fetch(GAS_URL, {
       method: 'POST',
-      mode: 'cors', // Changed from no-cors to cors to read response
+      mode: 'cors',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ action, sheetName, data, currentUser }),
     });
 
-    if (!response.ok) throw new Error('Network response was not ok');
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Network response was not ok: ${response.status} ${errorText}`);
+    }
     
     const result = await response.json();
     return result;
   } catch (error: any) {
     console.error('GAS Service Error:', error);
-    // Fallback for demo if GAS is not yet configured or CORS issues
-    if (action === 'login') {
-      return { success: true, user: { id: '1', users: 'admin', role: 'Admin', name: 'Admin User' } };
-    }
-    return { success: false, error: error.message };
+    return { 
+      success: false, 
+      error: `ไม่สามารถเชื่อมต่อกับฐานข้อมูลได้: ${error.message}. โปรดตรวจสอบการตั้งค่า CORS หรือสถานะการ Deploy ของ Google Apps Script.` 
+    };
   }
 };
