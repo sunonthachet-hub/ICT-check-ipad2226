@@ -26,7 +26,11 @@ function doPost(e) {
 
     let result;
     switch (action) {
-      case 'login': result = login(data); break;
+      case 'login': 
+        result = login(data); 
+        return ContentService.createTextOutput(JSON.stringify({ success: true, user: result }))
+          .setMimeType(ContentService.MimeType.JSON);
+      
       case 'read':  result = readData(sheetName); break;
       case 'append': result = appendData(sheetName, data, user); break;
       case 'update': result = updateData(sheetName, data, user); break;
@@ -42,7 +46,7 @@ function doPost(e) {
     return ContentService.createTextOutput(JSON.stringify({ success: true, data: result }))
       .setMimeType(ContentService.MimeType.JSON);
   } catch (error) {
-    return ContentService.createTextOutput(JSON.stringify({ success: false, message: error.toString() }))
+    return ContentService.createTextOutput(JSON.stringify({ success: false, error: error.toString() }))
       .setMimeType(ContentService.MimeType.JSON);
   }
 }
